@@ -1,0 +1,29 @@
+name: Feature request
+description: Suggest a new feature, plugin, or behavior for cdin-x
+title: "[feature] "
+labels: ["enhancement"]
+
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What part of the system does this help with?
+      description: cdin-x covers plugin management. Say where this fits (core system, plugin catalog, plugin manager, etc.)
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed implementation
+      description: Describe the proposed behavior or plugin
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Any alternative solutions or features you've considered
+    validations:
+      required: false
