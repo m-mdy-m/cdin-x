@@ -131,19 +131,21 @@ custom:
     - path: "/core/session_bootstrap.lua"
 
     # X/ — Essential plugins (non-removable)
-    - path: "/X/core/core.lua"
-    - path: "/X/core/vim.lua"
-    - path: "/X/core/treeview.lua"
-    - path: "/X/core/manifest.lua"
+    - path: "/X/core/core/manifest.lua"
+    - path: "/X/core/vim/manifest.lua"
+    - path: "/X/core/treeview/manifest.lua"
 
-    # X/ — Language plugins
-    - path: "/X/languages/manifest.lua"
+    # X/ — Generated catalog index
+    - path: "/X/manifest.lua"
 
-    # X/ — Optional plugins
-    - path: "/X/optional/manifest.lua"
+    # X/ — Syntax plugins (single-file)
+    - path: "/X/syntax/lua.lua"
+
+    # X/ — Extra (non-essential) plugins
+    - path: "/X/extras/theme_switcher/manifest.lua"
 
     # X/ — Themes
-    - path: "/X/themes/manifest.lua"
+    - path: "/X/themes/default.lua"
 
     # Examples
     - path: "/examples/README.md"
