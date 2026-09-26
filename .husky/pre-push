@@ -1,0 +1,8 @@
+#!/bin/sh
+# .husky/pre-push
+lua scripts/validate.lua
+if [ $? -ne 0 ]; then
+  echo "❌ Validation failed"
+  exit 1
+fi
+echo "✓ Validation passed"

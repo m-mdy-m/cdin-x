@@ -1,0 +1,23 @@
+# Code Owners
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Global owners
+*                   @m-mdy-m
+
+# Core runtime
+core/               @m-mdy-m
+
+# Extension catalog
+X/                  @m-mdy-m
+
+# Scripts
+scripts/            @m-mdy-m
+
+# Documentation
+docs/               @m-mdy-m
+
+# Examples
+examples/           @m-mdy-m
+
+# Fonts
+fonts/              @m-mdy-m

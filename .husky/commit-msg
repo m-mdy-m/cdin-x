@@ -1,0 +1,8 @@
+#!/bin/sh
+# .husky/commit-msg
+MSG=$(cat "$1")
+if ! echo "$MSG" | grep -qE "^(feat|fix|docs|refactor)\([^)]+\): "; then
+  echo "❌ Use conventional format: feat(scope): description"
+  exit 1
+fi
+echo "✓ Commit message OK"
