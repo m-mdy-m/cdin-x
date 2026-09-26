@@ -1,0 +1,18 @@
+name: cdin-x
+description: "Extension system for cdin text editor (C + Lua)"
+author: Mahdi
+email: bitsgenix@gmail.com
+github_user: m-mdy-m
+repo_name: cdin-x
+license: MIT
+version: "0.1.0"
+language: lua
+lua_version: "5.4"
+tags:
+  - "editor-extension"
+  - "lua"
+  - "plugin-system"
+ci:
+  provider: github
+  validate_command: "make validate"
+  quality_command: "make quality"
