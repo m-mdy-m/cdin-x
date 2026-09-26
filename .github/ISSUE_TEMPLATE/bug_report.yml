@@ -1,0 +1,46 @@
+name: Bug report
+description: Something in the plugin system didn't work as expected
+title: "[bug] "
+labels: ["bug"]
+
+body:
+  - type: textarea
+    id: command
+    attributes:
+      label: Command run
+      description: The exact cdin command you ran (e.g., pressed 'm' and selected something)
+      placeholder: m → Install Plugin → select plugin
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected vs. actual
+      description: What you expected to happen, and what actually happened
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Repro steps
+      description: Minimal steps to reproduce, if not obvious from the command above
+    validations:
+      required: false
+
+  - type: input
+    id: cdin-version
+    attributes:
+      label: cdin version
+      placeholder: output of cdin --version or check in Help menu
+    validations:
+      required: false
+
+  - type: input
+    id: plugin-name
+    attributes:
+      label: Plugin name
+      placeholder: The plugin that caused the issue (if applicable)
+    validations:
+      required: false
