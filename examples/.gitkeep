@@ -1,0 +1,7 @@
+examples/terraform/terraform.lua
+examples/terraform/manifest.lua
+examples/terraform/README.md
+examples/lua/lua.lua
+examples/lua/manifest.lua
+examples/lua/README.md
+examples/README.md
