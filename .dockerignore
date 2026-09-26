@@ -1,0 +1,80 @@
+# Build artifacts
+/build/
+*.tmp
+*.swp
+*.swo
+*~
+
+# Lua
+*.log
+lua_modules/
+
+# Secret keys
+.secrets/
+.env
+
+# Git hooks (local only)
+.husky/*
+!.husky/pre-commit
+!.husky/commit-msg
+!.husky/pre-push
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Backups
+*.bak
+*.orig
+
+# Temp
+*.bak
+*.orig
+
+# CDIN source files not needed in image
+src/
+data/
+scripts/
+lib/
+tests/
+mk/
+assets/
+website/
+docs/
+
+# CI / development-only files
+.github/
+.vscode/
+.idea/
+
+# Project files not needed
+*.rar
+*.md
+LICENSE
+CHANGELOG.md
+CODEOWNERS
+CONTRIBUTING.md
+SECURITY.md
+CODE_OF_CONDUCT.md
+NOTICE
+Makefile
+psx.yml
+.plx-project.yml
+.pre-commit-config.yaml
+.gitignore
+.editorconfig
+
+# Git
+.git/
+.gix/
+
+# Scripts
+scripts/
+
+# Examples
+examples/
