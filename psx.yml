@@ -1,0 +1,187 @@
+version: 1
+
+project:
+  type: "lua-plugin-extension"
+  name: "cdin-x"
+  description: "Extension system for cdin text editor (C + Lua)"
+
+rules:
+  # ── Documentation ──────────────────────────────
+  readme: error
+  license: error
+  changelog: info
+  contributing: error
+  api_docs: warning
+  security: info
+  code_of_conduct: info
+  pull_request_template: error
+  issue_templates: error
+  docs_folder: info
+
+  # ── Quality ────────────────────────────────────
+  pre_commit: error
+  editorconfig: error
+  code_owners: info
+  lint: error
+  tests_folder: warning
+
+  # ── DevOps ──────────────────────────────────────
+  dockerfile: warning
+  dockerignore: info
+  github_workflows: error
+  ci_cd: error
+  dependabot: info
+  pre_commit_hooks: info
+
+  # ── Plugin-specific ────────────────────────────
+  plugin_init: error
+  plugin_manifest: error
+  plugin_readme: error
+  plugin_test: warning
+
+  # ── Structure ──────────────────────────────────
+  X_folder: error
+  core_folder: error
+  scripts_folder: info
+  docs_folder: info
+  examples_folder: info
+  issue_templates: error
+  pr_template: error
+
+custom:
+  folders:
+    # Core system — plugin engine
+    - path: "core"
+      structure:
+        init: {}
+        manager: {}
+        config: {}
+        manifest: {}
+        command: {}
+        session_bootstrap: {}
+
+    # Extension catalog — categories are open-ended.
+    - path: "X"
+      structure: {}
+
+    # Documentation
+    - path: "docs"
+      structure:
+        architecture: {}
+        api: {}
+        development: {}
+        guides: {}
+        README: {}
+        getting-start: {}
+        INSTALLATION: {}
+        Introduction: {}
+
+    # Scripts
+    - path: "scripts"
+      structure:
+        new-plugin: {}
+        plugin-list: {}
+        validate: {}
+        generate-manifest: {}
+        install: {}
+        README: {}
+
+    # Git hooks
+    - path: ".husky"
+      structure:
+        pre-commit: {}
+        commit-msg: {}
+        pre-push: {}
+
+    # GitHub templates & workflows
+    - path: ".github/ISSUE_TEMPLATE"
+      structure:
+        bug_report: {}
+        feature_request: {}
+        config: {}
+
+    - path: ".github/workflows"
+      structure:
+        build: {}
+        release: {}
+
+  files:
+    # Root project files
+    - path: "/psx.yml"
+    - path: "/.psx-project.yml"
+    - path: "/README.md"
+    - path: "/CHANGELOG.md"
+    - path: "/LICENSE"
+    - path: "/Makefile"
+    - path: "/CONTRIBUTING.md"
+    - path: "/CODE_OF_CONDUCT.md"
+    - path: "/CODEOWNERS"
+    - path: "/SECURITY.md"
+    - path: "/.gitignore"
+    - path: "/.editorconfig"
+    - path: "/.gix/config"
+    - path: "/.pre-commit-config.yaml"
+
+    # Core system
+    - path: "/core/init.lua"
+    - path: "/core/manager.lua"
+    - path: "/core/config.lua"
+    - path: "/core/manifest.lua"
+    - path: "/core/command.lua"
+    - path: "/core/session_bootstrap.lua"
+
+    # X/ — Essential plugins (non-removable)
+    - path: "/X/core/core.lua"
+    - path: "/X/core/vim.lua"
+    - path: "/X/core/treeview.lua"
+    - path: "/X/core/manifest.lua"
+
+    # X/ — Language plugins
+    - path: "/X/languages/manifest.lua"
+
+    # X/ — Optional plugins
+    - path: "/X/optional/manifest.lua"
+
+    # X/ — Themes
+    - path: "/X/themes/manifest.lua"
+
+    # Examples
+    - path: "/examples/README.md"
+    - path: "/examples/terraform/terraform.lua"
+    - path: "/examples/terraform/manifest.lua"
+    - path: "/examples/terraform/README.md"
+    - path: "/examples/lua/lua.lua"
+    - path: "/examples/lua/manifest.lua"
+    - path: "/examples/lua/README.md"
+
+    # Documentation
+    - path: "/docs/README.md"
+    - path: "/docs/architecture/README.md"
+    - path: "/docs/api/README.md"
+    - path: "/docs/development/README.md"
+    - path: "/docs/guides/README.md"
+    - path: "/docs/getting-start.md"
+    - path: "/docs/INSTALLATION.md"
+    - path: "/docs/Introduction.md"
+
+    # Scripts
+    - path: "/scripts/new-plugin.lua"
+    - path: "/scripts/plugin-list.lua"
+    - path: "/scripts/validate.lua"
+    - path: "/scripts/generate-manifest.lua"
+    - path: "/scripts/install.sh"
+    - path: "/scripts/README.md"
+
+    # GitHub templates & workflows
+    - path: "/.github/PULL_REQUEST_TEMPLATE.md"
+    - path: "/.github/dependabot.yml"
+    - path: "/.github/ISSUE_TEMPLATE/bug_report.yml"
+    - path: "/.github/ISSUE_TEMPLATE/feature_request.yml"
+    - path: "/.github/ISSUE_TEMPLATE/config.yml"
+    - path: "/.github/workflows/build.yml"
+    - path: "/.github/workflows/release.yml"
+
+    # Git hooks
+    - path: "/.husky/pre-commit"
+    - path: "/.husky/commit-msg"
+    - path: "/.husky/pre-push"
