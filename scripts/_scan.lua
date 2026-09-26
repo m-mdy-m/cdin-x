@@ -55,6 +55,22 @@ function M.exists(path)
   return false
 end
 
+function M.is_file(path)
+  local attr = io.popen('stat -c "%F" "' .. path .. '" 2>/dev/null')
+  if not attr then return false end
+  local kind = attr:read("*a"):gsub("%s+", "")
+  attr:close()
+  return kind == "regular file" or kind == "regularfile"
+end
+
+function M.is_dir(path)
+  local attr = io.popen('stat -c "%F" "' .. path .. '" 2>/dev/null')
+  if not attr then return false end
+  local kind = attr:read("*a"):gsub("%s+", "")
+  attr:close()
+  return kind == "directory"
+end
+
 function M.list_dir(path)
   local results = {}
   local handle = io.popen('ls "' .. path .. '" 2>/dev/null')
@@ -66,6 +82,54 @@ function M.list_dir(path)
   end
   handle:close()
   return results
+end
+
+-- Discovers every plugin directly under X/<category>/, in any of the
+-- three on-disk shapes the runtime (core/manager/catalog.lua) accepts:
+--   <category>/<name>/manifest.lua + init.lua   (folder, split manifest)
+--   <category>/<name>/init.lua only              (folder, merged manifest)
+--   <category>/<name>.lua                         (single file)
+-- Returns a list of { name, category, plugin_dir, meta } — meta is the
+-- table returned by dofile'ing whichever file holds the manifest fields
+-- for that plugin. plugin_dir is what list_files_recursive() should be
+-- called with to freeze that plugin's file set.
+function M.discover_plugins(x_root)
+  local out = {}
+  for _, category_entry in ipairs(M.list_dir(x_root)) do
+    local category = category_entry.name
+    if category_entry.type == "dir" and category ~= ".git" and category ~= "themes" then
+      local cat_dir = x_root .. "/" .. category
+      for _, entry in ipairs(M.list_dir(cat_dir)) do
+        if entry.type == "dir" then
+          local plugin_dir = cat_dir .. "/" .. entry.name
+          local manifest_file = plugin_dir .. "/manifest.lua"
+          local init_file = plugin_dir .. "/init.lua"
+          local meta_file
+          if M.is_file(manifest_file) then
+            meta_file = manifest_file
+          elseif M.is_file(init_file) then
+            meta_file = init_file
+          end
+          if meta_file then
+            local meta = M.read_manifest(meta_file)
+            if meta and meta.name then
+              out[#out + 1] = { name = meta.name, category = category, plugin_dir = plugin_dir, meta = meta }
+            end
+          end
+        elseif entry.name ~= "manifest.lua" then
+          local name = entry.name:match("^(.+)%.lua$")
+          if name then
+            local file_path = cat_dir .. "/" .. entry.name
+            local meta = M.read_manifest(file_path)
+            if meta and meta.name then
+              out[#out + 1] = { name = meta.name, category = category, plugin_dir = file_path, meta = meta }
+            end
+          end
+        end
+      end
+    end
+  end
+  return out
 end
 
 -- Recursively list every regular file under `dir`. Returned paths are
