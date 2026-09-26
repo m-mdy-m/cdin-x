@@ -1,0 +1,1 @@
+return {name="cdin-x",version="0.2.0",description="CDIN-X runtime",author="cdin Team",license="MIT",category="runtime",type="runtime",essential=true,dependencies={},min_cdin_version="0.5.0",tags={"runtime","core"}}
