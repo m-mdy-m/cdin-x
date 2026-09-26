@@ -1,0 +1,33 @@
+# Build artifacts
+/build/
+*.tmp
+*.swp
+*.swo
+*~
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Lua
+*.log
+lua_modules/
+
+# Secret keys
+.secrets/
+.env
+
+# Git hooks (local only)
+.husky/*
+!.husky/pre-commit
+!.husky/commit-msg
+!.husky/pre-push
+
+# Temp
+*.bak
+*.orig
