@@ -1,0 +1,1 @@
+this is menu plugins for fmenu menu and any menu for cdin
