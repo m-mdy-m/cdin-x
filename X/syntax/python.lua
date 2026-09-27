@@ -8,7 +8,7 @@ return {
   description = "Python syntax support",
   author = "cdin Team",
   license = "MIT",
-  category = "languages",
+  category = "syntax",
   type = "plugin",
   essential = false,
   dependencies = {  },
