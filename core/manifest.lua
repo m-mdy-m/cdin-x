@@ -4,19 +4,33 @@ local Manifest = {}
 
 function Manifest.load(plugin_path)
   local manifest_file = plugin_path .. "/manifest.lua"
-  if not fs.is_file(manifest_file) then
-    return nil, "missing manifest.lua"
+  if fs.is_file(manifest_file) then
+    local ok, value = pcall(dofile, manifest_file)
+    if not ok then
+      return nil, "manifest error: " .. tostring(value)
+    end
+    if type(value) ~= "table" then
+      return nil, "manifest must return a table"
+    end
+    return value
   end
 
-  local ok, value = pcall(dofile, manifest_file)
-  if not ok then
-    return nil, "manifest error: " .. tostring(value)
-  end
-  if type(value) ~= "table" then
-    return nil, "manifest must return a table"
+  local init_file = plugin_path .. "/init.lua"
+  if fs.is_file(init_file) then
+    local ok, value = pcall(dofile, init_file)
+    if not ok then
+      return nil, "init.lua error: " .. tostring(value)
+    end
+    if type(value) ~= "table" then
+      return nil, "init.lua must return a table"
+    end
+    if type(value.name) ~= "string" then
+      return nil, "init.lua has no inline manifest fields (and no manifest.lua present)"
+    end
+    return value
   end
 
-  return value
+  return nil, "missing manifest.lua or init.lua"
 end
 
 function Manifest.validate(m)

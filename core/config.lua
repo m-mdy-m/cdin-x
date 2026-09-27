@@ -31,8 +31,6 @@ config.extension_dir  = config.extension_dir or (base_data .. sep .. "extensions
 config.registry_dir   = config.registry_dir or (base_data .. sep .. "registry" .. sep .. "cdin-x")
 config.state_file     = config.state_file or (base_data .. sep .. "extensions.lua")
 config.registry_url   = config.registry_url or "https://github.com/m-mdy-m/cdin-x.git"
-config.plugins        = config.plugins or {}
-config.plugins_enabled_by_default = config.plugins_enabled_by_default ~= false
 config.fonts_dir = config.fonts_dir or (EXEDIR .. "/data/fonts")
 
 return config

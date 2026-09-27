@@ -1,8 +1,10 @@
+-- preboot.lua — catalog-listing copy of cdin core's generic pre-boot state
+-- reader (cdin/data/core/preboot.lua). 
 local M = {}
 
 local IS_WIN = PATHSEP == "\\"
 
-local function session_path()
+local function boot_state_path()
   local base
   if IS_WIN then
     base = os.getenv("APPDATA") or os.getenv("USERPROFILE") or "."
@@ -13,16 +15,16 @@ local function session_path()
   end
 end
 
-local function empty_session()
+local function empty_state()
   return { recent_files = {}, recent_dirs = {}, last_dir = nil, theme = nil }
 end
 
 function M.read()
-  local path = session_path()
+  local path = boot_state_path()
   local ok, chunk = pcall(loadfile, path)
-  if not ok or not chunk then return empty_session() end
+  if not ok or not chunk then return empty_state() end
   local ok2, data = pcall(chunk)
-  if not ok2 or type(data) ~= "table" then return empty_session() end
+  if not ok2 or type(data) ~= "table" then return empty_state() end
   if data.recent and not data.recent_files then
     data.recent_files = data.recent
     data.recent = nil
@@ -34,6 +36,6 @@ function M.read()
   return data
 end
 
-M.session_path = session_path
+M.path = boot_state_path
 
 return M

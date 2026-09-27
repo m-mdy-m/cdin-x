@@ -6,12 +6,12 @@ local Manager = require "core.x.manager"
 local Command = {}
 
 local CATEGORY_NAMES = {
-  core="CORE", languages="LANGUAGES", lsp="LSP", formatters="FORMATTERS",
+  core="CORE", syntax="SYNTAX", lsp="LSP", formatters="FORMATTERS",
   git="GIT", debug="DEBUG", ui="UI", utils="UTILS",
   optional="OPTIONAL", themes="THEMES",
 }
 local CATEGORY_ORDER = {
-  "core","languages","lsp","formatters","git","debug","ui","utils","optional","themes",
+  "core","syntax","lsp","formatters","git","debug","ui","utils","optional","themes",
 }
 
 local function status(plugin)

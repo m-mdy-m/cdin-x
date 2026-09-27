@@ -12,12 +12,12 @@ local Command = require "core.x.command"
 config.pluginmanager_size = 260 * SCALE
 
 local CATEGORY_NAMES = {
-  core = "CORE", languages = "LANGUAGES", lsp = "LSP", formatters = "FORMATTERS",
+  core = "CORE", syntax = "SYNTAX", lsp = "LSP", formatters = "FORMATTERS",
   git = "GIT", debug = "DEBUG", ui = "UI", utils = "UTILS",
   optional = "OPTIONAL", themes = "THEMES",
 }
 local CATEGORY_ORDER = {
-  "core", "languages", "lsp", "formatters", "git", "debug", "ui", "utils", "optional", "themes",
+  "core", "syntax", "lsp", "formatters", "git", "debug", "ui", "utils", "optional", "themes",
 }
 
 local PluginManagerView = View:extend()
@@ -39,9 +39,6 @@ function PluginManagerView:get_item_height()
   return style.font:get_height() + style.padding.y
 end
 
--- Flattens Manager's catalog into an ordered row list: one header row
--- per non-empty category, one row per extension in that category. Rebuilt
--- on demand (see :invalidate / :refresh) rather than every frame.
 function PluginManagerView:_rebuild_rows()
   Manager.scan()
   local plugins = Manager.list()
@@ -141,13 +138,6 @@ function PluginManagerView:get_cursor_plugin()
   return row and row.kind == "plugin" and row.plugin or nil
 end
 
--- Status glyph + color for a row. This is the single place that decides
--- what the colored marker looks like, so the palette (command.lua) and
--- this panel never disagree about what "active" means.
---   essential/builtin -> dim "#" (locked, cannot be toggled)
---   installed+enabled -> green "x" (matches the request: active = green x)
---   installed+disabled -> dim "-"
---   available, not installed -> dim "."
 local function status_marker(plugin)
   if plugin._source == "builtin" or plugin.essential then
     return "#", style.dim
@@ -342,13 +332,6 @@ command.add(function() return core.active_view == view end, {
   end,
 })
 
--- Keymap bindings. These are the plain (non-vim-mode) bindings. When vim
--- mode is enabled, X/core/vim/vimode.lua intercepts "m"/"shift+m" itself
--- (before keymap.on_key_pressed even runs) and calls the exact same
--- pluginmanager:* commands — so behavior is identical either way, only
--- the interception point differs. This block is what makes shift+m work
--- at all when vim mode is off, and is what makes j/k/space/enter/u work
--- for mouse-and-arrow-key users regardless of vim mode.
 keymap.add {
   ["shift+m"] = "pluginmanager:toggle",
 }
