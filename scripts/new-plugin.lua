@@ -37,7 +37,6 @@ return {
   titlebar_button_hover = "#313244", titlebar_close_hover = "#f38ba8",
   vim_pill_fg = "#1e1e2e", vim_normal_bg = "#45475a",
   vim_insert_bg = "#89b4fa", vim_visual_bg = "#f5c2e7",
-  vim_replace_bg = "#f38ba8", vim_command_bg = "#a6e3a1",
   git_modified = "#f9e2af", git_added = "#a6e3a1", git_deleted = "#f38ba8",
   git_conflict = "#fab387", git_untracked = "#6c7086", git_renamed = "#cba6f7",
   syntax = {
