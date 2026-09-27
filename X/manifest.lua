@@ -1,4 +1,6 @@
--- Generated catalog index. Plugins use manifest.lua; themes use theme.lua.
+-- Generated catalog index. Multi-module plugins use manifest.lua
+-- (inside their own directory); single-file plugins and themes carry
+-- the same manifest fields inline in their one .lua file.
 -- `files` on every entry lists that entry's files relative to the repo
 -- root, so callers can fetch them individually without cloning.
 return {
@@ -6,10 +8,17 @@ return {
     "core/command.lua",
     "core/config.lua",
     "core/init.lua",
-    "core/manager.lua",
+    "core/manager/catalog.lua",
+    "core/manager/deps.lua",
+    "core/manager/git.lua",
+    "core/manager/init.lua",
+    "core/manager/lifecycle.lua",
+    "core/manager/runtime.lua",
+    "core/manager/state.lua",
+    "core/manager/util.lua",
     "core/manifest.lua",
     "core/panel.lua",
-    "core/session_bootstrap.lua",
+    "core/preboot.lua",
   },
   plugins = {
     ["autocomplete"] = {
@@ -17,12 +26,9 @@ return {
       type = "plugin",
       version = "0.1.0",
       description = "Symbol-based completion popup for open documents",
-      essential = true,
+      essential = false,
       files = {
-        "X/core/autocomplete/README.md",
-        "X/core/autocomplete/impl.lua",
-        "X/core/autocomplete/init.lua",
-        "X/core/autocomplete/manifest.lua",
+        "X/autocomplete/autocomplete.lua",
       },
     },
     ["autoreload"] = {
@@ -32,36 +38,17 @@ return {
       description = "Reload files changed outside CDIN",
       essential = true,
       files = {
-        "X/core/autoreload/README.md",
-        "X/core/autoreload/impl.lua",
-        "X/core/autoreload/init.lua",
-        "X/core/autoreload/manifest.lua",
-      },
-    },
-    ["autoupdate"] = {
-      category = "core",
-      type = "plugin",
-      version = "0.1.0",
-      description = "Check CDIN releases and offer updates",
-      essential = true,
-      files = {
-        "X/core/autoupdate/README.md",
-        "X/core/autoupdate/impl.lua",
-        "X/core/autoupdate/init.lua",
-        "X/core/autoupdate/manifest.lua",
+        "X/core/autoreload.lua",
       },
     },
     ["c"] = {
-      category = "languages",
+      category = "syntax",
       type = "plugin",
       version = "0.1.0",
       description = "C language syntax support",
       essential = false,
       files = {
-        "X/languages/c/README.md",
-        "X/languages/c/impl.lua",
-        "X/languages/c/init.lua",
-        "X/languages/c/manifest.lua",
+        "X/syntax/c.lua",
       },
     },
     ["catppuccin-mocha"] = {
@@ -71,7 +58,7 @@ return {
       description = "Theme: catppuccin-mocha",
       essential = false,
       files = {
-        "X/themes/catppuccin-mocha/theme.lua",
+        "X/themes/catppuccin-mocha.lua",
       },
     },
     ["core"] = {
@@ -81,9 +68,7 @@ return {
       description = "CDIN built-in core extensions",
       essential = true,
       files = {
-        "X/core/core/README.md",
-        "X/core/core/init.lua",
-        "X/core/core/manifest.lua",
+        "X/core/core.lua",
       },
     },
     ["default"] = {
@@ -93,7 +78,7 @@ return {
       description = "Theme: default",
       essential = true,
       files = {
-        "X/themes/default/theme.lua",
+        "X/themes/default.lua",
       },
     },
     ["dracula"] = {
@@ -103,7 +88,24 @@ return {
       description = "Theme: dracula",
       essential = false,
       files = {
-        "X/themes/dracula/theme.lua",
+        "X/themes/dracula.lua",
+      },
+    },
+    ["git"] = {
+      category = "core",
+      type = "plugin",
+      version = "0.1.0",
+      description = "Git status, branch/ahead-behind info, ignore filtering, and shell command shortcuts",
+      essential = true,
+      files = {
+        "X/core/git/commands.lua",
+        "X/core/git/exec.lua",
+        "X/core/git/init.lua",
+        "X/core/git/manager/find-git.lua",
+        "X/core/git/manager/ops.lua",
+        "X/core/git/manager/utils.lua",
+        "X/core/git/manifest.lua",
+        "X/core/git/status.lua",
       },
     },
     ["github-light"] = {
@@ -113,7 +115,7 @@ return {
       description = "Theme: github-light",
       essential = false,
       files = {
-        "X/themes/github-light/theme.lua",
+        "X/themes/github-light.lua",
       },
     },
     ["gruvbox-dark"] = {
@@ -123,46 +125,37 @@ return {
       description = "Theme: gruvbox-dark",
       essential = false,
       files = {
-        "X/themes/gruvbox-dark/theme.lua",
+        "X/themes/gruvbox-dark.lua",
       },
     },
     ["javascript"] = {
-      category = "languages",
+      category = "syntax",
       type = "plugin",
       version = "0.1.0",
       description = "JavaScript syntax support",
       essential = false,
       files = {
-        "X/languages/javascript/README.md",
-        "X/languages/javascript/impl.lua",
-        "X/languages/javascript/init.lua",
-        "X/languages/javascript/manifest.lua",
+        "X/syntax/javascript.lua",
       },
     },
     ["lua"] = {
-      category = "languages",
+      category = "syntax",
       type = "plugin",
       version = "0.1.0",
       description = "Lua syntax support",
       essential = false,
       files = {
-        "X/languages/lua/README.md",
-        "X/languages/lua/impl.lua",
-        "X/languages/lua/init.lua",
-        "X/languages/lua/manifest.lua",
+        "X/syntax/lua.lua",
       },
     },
     ["markdown"] = {
-      category = "languages",
+      category = "syntax",
       type = "plugin",
       version = "0.1.0",
       description = "Markdown syntax support",
       essential = false,
       files = {
-        "X/languages/markdown/README.md",
-        "X/languages/markdown/impl.lua",
-        "X/languages/markdown/init.lua",
-        "X/languages/markdown/manifest.lua",
+        "X/syntax/markdown.lua",
       },
     },
     ["monokai"] = {
@@ -172,7 +165,7 @@ return {
       description = "Theme: monokai",
       essential = false,
       files = {
-        "X/themes/monokai/theme.lua",
+        "X/themes/monokai.lua",
       },
     },
     ["nord"] = {
@@ -182,7 +175,7 @@ return {
       description = "Theme: nord",
       essential = false,
       files = {
-        "X/themes/nord/theme.lua",
+        "X/themes/nord.lua",
       },
     },
     ["projectsearch"] = {
@@ -192,23 +185,17 @@ return {
       description = "Search project files using ripgrep/find",
       essential = true,
       files = {
-        "X/core/projectsearch/README.md",
-        "X/core/projectsearch/impl.lua",
-        "X/core/projectsearch/init.lua",
-        "X/core/projectsearch/manifest.lua",
+        "X/projectsearch/projectsearch.lua",
       },
     },
     ["python"] = {
-      category = "languages",
+      category = "syntax",
       type = "plugin",
       version = "0.1.0",
       description = "Python syntax support",
       essential = false,
       files = {
-        "X/languages/python/README.md",
-        "X/languages/python/impl.lua",
-        "X/languages/python/init.lua",
-        "X/languages/python/manifest.lua",
+        "X/syntax/python.lua",
       },
     },
     ["rtl_toggle"] = {
@@ -224,19 +211,6 @@ return {
         "X/optional/rtl_toggle/manifest.lua",
       },
     },
-    ["session"] = {
-      category = "core",
-      type = "plugin",
-      version = "0.1.0",
-      description = "Persistent session restore for buffers and project state",
-      essential = true,
-      files = {
-        "X/core/session/README.md",
-        "X/core/session/impl.lua",
-        "X/core/session/init.lua",
-        "X/core/session/manifest.lua",
-      },
-    },
     ["solarized-dark"] = {
       category = "themes",
       type = "theme",
@@ -244,7 +218,7 @@ return {
       description = "Theme: solarized-dark",
       essential = false,
       files = {
-        "X/themes/solarized-dark/theme.lua",
+        "X/themes/solarized-dark.lua",
       },
     },
     ["solarized-light"] = {
@@ -254,7 +228,7 @@ return {
       description = "Theme: solarized-light",
       essential = false,
       files = {
-        "X/themes/solarized-light/theme.lua",
+        "X/themes/solarized-light.lua",
       },
     },
     ["tab"] = {
@@ -268,8 +242,10 @@ return {
         "X/core/tab/commands.lua",
         "X/core/tab/impl.lua",
         "X/core/tab/init.lua",
+        "X/core/tab/keymap.lua",
         "X/core/tab/manager.lua",
-        "X/core/tab/manifest.lua",
+        "X/core/tab/manager/index.lua",
+        "X/core/tab/manager/operation.lua",
         "X/core/tab/session.lua",
       },
     },
@@ -293,7 +269,7 @@ return {
       description = "Theme: tokyo-night",
       essential = false,
       files = {
-        "X/themes/tokyo-night/theme.lua",
+        "X/themes/tokyo-night.lua",
       },
     },
     ["treeview"] = {
@@ -307,8 +283,10 @@ return {
         "X/core/treeview/cache.lua",
         "X/core/treeview/git.lua",
         "X/core/treeview/init.lua",
-        "X/core/treeview/manifest.lua",
+        "X/core/treeview/keymap.lua",
         "X/core/treeview/nav.lua",
+        "X/core/treeview/tree/build.lua",
+        "X/core/treeview/tree/operations.lua",
         "X/core/treeview/treeview_impl.lua",
       },
     },
@@ -319,23 +297,17 @@ return {
       description = "Trim trailing whitespace on save",
       essential = true,
       files = {
-        "X/core/trimwhitespace/README.md",
-        "X/core/trimwhitespace/impl.lua",
-        "X/core/trimwhitespace/init.lua",
-        "X/core/trimwhitespace/manifest.lua",
+        "X/core/trimwhitespace.lua",
       },
     },
     ["typescript"] = {
-      category = "languages",
+      category = "syntax",
       type = "plugin",
       version = "0.1.0",
       description = "TypeScript syntax support",
       essential = false,
       files = {
-        "X/languages/typescript/README.md",
-        "X/languages/typescript/impl.lua",
-        "X/languages/typescript/init.lua",
-        "X/languages/typescript/manifest.lua",
+        "X/syntax/typescript.lua",
       },
     },
     ["unicode_inspect"] = {
@@ -359,10 +331,17 @@ return {
       essential = true,
       files = {
         "X/core/vim/README.md",
+        "X/core/vim/commands/tab.lua",
+        "X/core/vim/commands/vim.lua",
+        "X/core/vim/commands/vim.menu.lua",
+        "X/core/vim/commands/vim.shell.lua",
+        "X/core/vim/commands/window.lua",
         "X/core/vim/ex.lua",
         "X/core/vim/fmenu.lua",
         "X/core/vim/init.lua",
-        "X/core/vim/manifest.lua",
+        "X/core/vim/menu/build.lua",
+        "X/core/vim/menu/exec.lua",
+        "X/core/vim/menu/fs.ops.lua",
         "X/core/vim/shell.lua",
         "X/core/vim/vimode.lua",
       },
@@ -376,10 +355,11 @@ return {
       files = {
         "X/core/window/README.md",
         "X/core/window/commands.lua",
-        "X/core/window/impl.lua",
         "X/core/window/init.lua",
+        "X/core/window/keymap.lua",
         "X/core/window/manager.lua",
-        "X/core/window/manifest.lua",
+        "X/core/window/manager/focus.lua",
+        "X/core/window/manager/ops.lua",
       },
     },
   },
