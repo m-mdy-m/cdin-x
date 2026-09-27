@@ -31,3 +31,5 @@ lua_modules/
 # Temp
 *.bak
 *.orig
+
+.psx-project.yml
