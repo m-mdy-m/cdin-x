@@ -5,8 +5,6 @@ It is deliberately separate from the editor runtime: cdin ships only its core ru
 and a small set of mandatory built-in extensions, while optional extensions live here
 and are installed per-user.
 
-![cdin-x](assets/CDIN-X.png)
-
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-0.1.0-orange.svg)](CHANGELOG.md)
 
