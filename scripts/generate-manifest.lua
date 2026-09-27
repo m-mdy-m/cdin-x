@@ -6,39 +6,29 @@ end
 
 local plugins = {}
 
-for _, found in ipairs(scan.discover_plugins("X")) do
-  local meta = found.meta
-  plugins[found.name] = {
-    category = meta.category or found.category,
-    type = meta.type or "plugin",
-    version = meta.version or "0.0.0",
-    description = meta.description or "",
-    essential = meta.essential == true,
-    files = scan.list_files_recursive(found.plugin_dir),
-  }
+for _, entry in ipairs(scan.plugin_entries()) do
+  local meta = entry.meta
+  if meta.name then
+    plugins[meta.name] = {
+      category = entry.category,
+      type = meta.type or "plugin",
+      version = meta.version or "0.0.0",
+      description = meta.description or "",
+      essential = meta.essential == true,
+      files = entry.single_file and { entry.path } or scan.list_files_recursive(entry.base),
+    }
+  end
 end
 
-local themes_dir = "X/themes"
-if scan.exists(themes_dir) then
-  for _, entry in ipairs(scan.list_dir(themes_dir) or {}) do
-    if entry.type == "file" then
-      local theme_name = entry.name:match("^(.+)%.lua$")
-      if theme_name then
-        local theme_file = themes_dir .. "/" .. entry.name
-        local ok, theme_data = pcall(dofile, theme_file)
-        if ok and type(theme_data) == "table" and theme_data.name then
-          plugins[theme_data.name] = {
-            category = "themes",
-            type = "theme",
-            version = "0.1.0",
-            description = "Theme: " .. theme_data.name,
-            essential = theme_data.essential == true,
-            files = { theme_file },
-          }
-        end
-      end
-    end
-  end
+for _, theme in ipairs(scan.theme_entries()) do
+  plugins[theme.name] = {
+    category = "themes",
+    type = "theme",
+    version = "0.1.0",
+    description = "Theme: " .. theme.name,
+    essential = theme.data.essential == true,
+    files = { theme.path },
+  }
 end
 
 local names = {}
@@ -46,9 +36,9 @@ for name in pairs(plugins) do names[#names + 1] = name end
 table.sort(names)
 
 local lines = {
-  "-- Generated catalog index. See core/manager/catalog.lua for the",
-  "-- three on-disk plugin shapes this scans (folder + manifest.lua,",
-  "-- folder + merged init.lua, or a single <name>.lua). Themes use theme.lua.",
+  "-- Generated catalog index. Multi-module plugins use manifest.lua",
+  "-- (inside their own directory); single-file plugins and themes carry",
+  "-- the same manifest fields inline in their one .lua file.",
   "-- `files` on every entry lists that entry's files relative to the repo",
   "-- root, so callers can fetch them individually without cloning.",
   "return {",

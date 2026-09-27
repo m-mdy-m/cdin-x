@@ -10,6 +10,91 @@ local function shell_quote(path)
   return "'" .. path:gsub("'", "'\\''") .. "'"
 end
 
+function M.plugin_entries()
+  local entries = {}
+  local seen_dirs = {}
+
+  -- old format, separate manifest: X/<category>/<name>/manifest.lua
+  local command
+  if SEP == "\\" then
+    command = 'powershell -NoProfile -Command "Get-ChildItem -Path X -Recurse -Filter manifest.lua -File | ForEach-Object { $_.FullName }"'
+  else
+    command = "find " .. shell_quote("X") .. " -type f -name manifest.lua -print"
+  end
+  local pipe = io.popen(command)
+  if pipe then
+    for line in pipe:lines() do
+      if line ~= "" then
+        local plugin_dir = M.dirname(line)
+        local category = plugin_dir and plugin_dir:match("X[/\\]([^/\\]+)[/\\][^/\\]+$")
+        if category then
+          local meta = M.read_manifest(line)
+          if meta then
+            entries[#entries + 1] = {
+              path = line, meta = meta, category = meta.category or category,
+              single_file = false, base = plugin_dir,
+            }
+            seen_dirs[plugin_dir] = true
+          end
+        end
+      end
+    end
+    pipe:close()
+  end
+
+  -- old format, manifest inlined in init.lua: X/<category>/<name>/init.lua
+  for _, category_entry in ipairs(M.list_dir("X") or {}) do
+    if category_entry.type == "dir" and category_entry.name ~= ".git" then
+      local cat_dir = "X/" .. category_entry.name
+      for _, entry in ipairs(M.list_dir(cat_dir) or {}) do
+        if entry.type == "dir" then
+          local plugin_dir = cat_dir .. "/" .. entry.name
+          if not seen_dirs[plugin_dir] then
+            local init_path = plugin_dir .. "/init.lua"
+            if M.exists(init_path) then
+              local ok, meta = pcall(dofile, init_path)
+              if ok and type(meta) == "table" and type(meta.name) == "string" then
+                entries[#entries + 1] = {
+                  path = init_path, meta = meta,
+                  category = meta.category or category_entry.name,
+                  single_file = false, base = plugin_dir,
+                }
+              end
+            end
+          end
+        end
+      end
+    end
+  end
+
+  -- new format: X/<category>/<name>.lua (excluding the category's own
+  -- generated "manifest.lua" index file, which lives at that same depth)
+  for _, category_entry in ipairs(M.list_dir("X") or {}) do
+    if category_entry.type == "dir" and category_entry.name ~= ".git" then
+      local cat_dir = "X/" .. category_entry.name
+      for _, entry in ipairs(M.list_dir(cat_dir) or {}) do
+        if entry.type == "file" and entry.name ~= "manifest.lua" then
+          local name = entry.name:match("^(.+)%.lua$")
+          if name then
+            local file_path = cat_dir .. "/" .. entry.name
+            local ok, meta = pcall(dofile, file_path)
+            if ok and type(meta) == "table" then
+              entries[#entries + 1] = {
+                path = file_path, meta = meta,
+                category = meta.category or category_entry.name,
+                single_file = true, base = cat_dir,
+              }
+            end
+          end
+        end
+      end
+    end
+  end
+
+  table.sort(entries, function(a, b) return a.path < b.path end)
+  return entries
+end
+
 function M.manifest_paths()
   local command
   if SEP == "\\" then
@@ -55,22 +140,6 @@ function M.exists(path)
   return false
 end
 
-function M.is_file(path)
-  local attr = io.popen('stat -c "%F" "' .. path .. '" 2>/dev/null')
-  if not attr then return false end
-  local kind = attr:read("*a"):gsub("%s+", "")
-  attr:close()
-  return kind == "regular file" or kind == "regularfile"
-end
-
-function M.is_dir(path)
-  local attr = io.popen('stat -c "%F" "' .. path .. '" 2>/dev/null')
-  if not attr then return false end
-  local kind = attr:read("*a"):gsub("%s+", "")
-  attr:close()
-  return kind == "directory"
-end
-
 function M.list_dir(path)
   local results = {}
   local handle = io.popen('ls "' .. path .. '" 2>/dev/null')
@@ -84,66 +153,6 @@ function M.list_dir(path)
   return results
 end
 
--- Discovers every plugin directly under X/<category>/, in any of the
--- three on-disk shapes the runtime (core/manager/catalog.lua) accepts:
---   <category>/<name>/manifest.lua + init.lua   (folder, split manifest)
---   <category>/<name>/init.lua only              (folder, merged manifest)
---   <category>/<name>.lua                         (single file)
--- Returns a list of { name, category, plugin_dir, meta } — meta is the
--- table returned by dofile'ing whichever file holds the manifest fields
--- for that plugin. plugin_dir is what list_files_recursive() should be
--- called with to freeze that plugin's file set.
-function M.discover_plugins(x_root)
-  local out = {}
-  for _, category_entry in ipairs(M.list_dir(x_root)) do
-    local category = category_entry.name
-    if category_entry.type == "dir" and category ~= ".git" and category ~= "themes" then
-      local cat_dir = x_root .. "/" .. category
-      for _, entry in ipairs(M.list_dir(cat_dir)) do
-        if entry.type == "dir" then
-          local plugin_dir = cat_dir .. "/" .. entry.name
-          local manifest_file = plugin_dir .. "/manifest.lua"
-          local init_file = plugin_dir .. "/init.lua"
-          local meta_file
-          if M.is_file(manifest_file) then
-            meta_file = manifest_file
-          elseif M.is_file(init_file) then
-            meta_file = init_file
-          end
-          if meta_file then
-            local meta = M.read_manifest(meta_file)
-            if meta and meta.name then
-              out[#out + 1] = { name = meta.name, category = category, plugin_dir = plugin_dir, meta = meta }
-            end
-          end
-        elseif entry.name ~= "manifest.lua" then
-          local name = entry.name:match("^(.+)%.lua$")
-          if name then
-            local file_path = cat_dir .. "/" .. entry.name
-            local meta = M.read_manifest(file_path)
-            if meta and meta.name then
-              out[#out + 1] = { name = meta.name, category = category, plugin_dir = file_path, meta = meta }
-            end
-          end
-        end
-      end
-    end
-  end
-  return out
-end
-
--- Recursively list every regular file under `dir`. Returned paths are
--- relative to repo root (forward slashes), NOT relative to `dir` — so
--- they can be used directly as URL suffixes onto a
--- raw.githubusercontent.com/<owner>/<repo>/<ref>/ prefix. `dir` itself
--- is expected to already be a repo-root-relative path (e.g.
--- "X/core/treeview" or "core"), matching how manifest_paths() and the
--- other scan helpers address things — that's what makes the result
--- repo-root-relative without a separate prefix argument.
---
--- Used to freeze each plugin's/theme's/core's file set into the
--- generated manifest, so installers can fetch files individually
--- (curl per file) without ever needing a directory listing API call.
 function M.list_files_recursive(dir)
   local command
   if SEP == "\\" then
@@ -164,6 +173,26 @@ function M.list_files_recursive(dir)
   pipe:close()
   table.sort(results)
   return results
+end
+
+function M.theme_entries()
+  local entries = {}
+  local themes_dir = "X/themes"
+  if not M.exists(themes_dir) then return entries end
+  for _, entry in ipairs(M.list_dir(themes_dir) or {}) do
+    if entry.type == "file" then
+      local name = entry.name:match("^(.+)%.lua$")
+      if name then
+        local path = themes_dir .. "/" .. entry.name
+        local ok, data = pcall(dofile, path)
+        if ok and type(data) == "table" then
+          entries[#entries + 1] = { name = name, path = path, data = data }
+        end
+      end
+    end
+  end
+  table.sort(entries, function(a, b) return a.name < b.name end)
+  return entries
 end
 
 return M

@@ -25,13 +25,17 @@ else
 end
 
 local essential_found = 0
-for _, path in ipairs(scan.manifest_paths()) do
-  local meta = scan.read_manifest(path)
-  if meta and meta.essential == true then
+for _, entry in ipairs(scan.plugin_entries()) do
+  if entry.meta.essential == true then
     essential_found = essential_found + 1
-    local base = scan.dirname(path)
-    if not exists(base .. "/init.lua") then errors[#errors+1] = base .. "/init.lua not found" end
-    if not exists(base .. "/README.md") then errors[#errors+1] = base .. "/README.md not found" end
+    if entry.single_file then
+      if not (type(entry.meta.init) == "function" or type(entry.meta.unload) == "function") then
+        errors[#errors+1] = entry.path .. ": essential single-file plugin has no init/unload"
+      end
+    else
+      if not exists(entry.base .. "/init.lua") then errors[#errors+1] = entry.base .. "/init.lua not found" end
+      if not exists(entry.base .. "/README.md") then errors[#errors+1] = entry.base .. "/README.md not found" end
+    end
   end
 end
 if essential_found == 0 then
@@ -40,23 +44,10 @@ end
 
 local essential_theme_found = 0
 if exists("X/themes") then
-  local handle = io.popen('ls -d X/themes/*/ 2>/dev/null')
-  if handle then
-    for dir in handle:lines() do
-      local name = dir:match("[^/]+/$")
-      if name and name ~= ".git" then
-        local theme_path = dir .. "theme.lua"
-        if not exists(theme_path) then
-          errors[#errors+1] = theme_path .. " not found (themes need only theme.lua)"
-        else
-          local ok, theme_data = pcall(dofile, theme_path)
-          if ok and type(theme_data) == "table" and theme_data.essential == true then
-            essential_theme_found = essential_theme_found + 1
-          end
-        end
-      end
+  for _, theme in ipairs(scan.theme_entries()) do
+    if theme.data.essential == true then
+      essential_theme_found = essential_theme_found + 1
     end
-    handle:close()
   end
 else
   errors[#errors+1] = "X/themes/ not found"
