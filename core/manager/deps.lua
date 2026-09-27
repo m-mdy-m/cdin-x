@@ -1,11 +1,7 @@
--- Dependency graph resolution for a set of extension names, given the
--- current catalog. Pure graph logic — no filesystem or loading side effects.
 local Catalog = require "core.x.manager.catalog"
 
 local Deps = {}
 
--- Returns names ordered so that every dependency precedes its dependents,
--- or nil + an error message on a missing/uninstalled dependency or a cycle.
 function Deps.topological_order(ctx, names)
   local ordered, visiting, visited = {}, {}, {}
 

@@ -1,5 +1,3 @@
--- Registry synchronization over git: cloning, pulling, and detecting a
--- sibling cdin-x checkout so a local dev setup never needs a network clone.
 local core = require "core"
 local fs   = require "core.fs"
 local Git  = require "core.git.exec"
@@ -28,9 +26,6 @@ local function sibling_registry(config)
   end
 end
 
--- Ensures the registry is present (and optionally up to date), mutating
--- config.registry_dir / ctx flags in place when a sibling checkout is used
--- instead of a managed clone. Returns true on success.
 function RegistrySync.ensure(config, ctx, force)
   if fs.is_dir(registry_root(config)) then
     if force and not ctx.registry_external then

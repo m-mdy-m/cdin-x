@@ -1,6 +1,3 @@
--- Small stateless helpers shared by the manager submodules.
--- No dependency on Manager state lives here — pure functions only.
-
 local Util = {}
 
 function Util.count(t)

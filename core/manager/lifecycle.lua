@@ -1,7 +1,3 @@
--- Lifecycle mutations on the installed-extension store: copying files in/out
--- of config.extension_dir, flipping the disabled flag, and keeping the lock
--- file in sync. Every function here that changes what's on disk is expected
--- to be followed by the caller re-running Catalog.merge_sources.
 local fs       = require "core.fs"
 local Manifest = require "core.x.manifest"
 local Util     = require "core.x.manager.util"
@@ -22,9 +18,6 @@ local function is_disabled(ctx, name)
   return ctx.state.disabled[name] == true
 end
 
--- install() expects the caller to have already ensured the registry and
--- merged sources; `resolve` is a callback used to re-look-up a plugin after
--- Manager pulls the registry for a name it doesn't yet know about.
 function Lifecycle.install(ctx, config, name, ensure_registry, save_state, stack)
   local plugin = ctx.available[name]
   if not plugin then
@@ -170,8 +163,6 @@ function Lifecycle.update(ctx, config, name, registry_root)
   return #errors == 0, { updated = updated, errors = errors }
 end
 
--- Finds installed extensions no longer reachable from anything: not a
--- dependency of any other installed extension, and no longer in the registry.
 function Lifecycle.clean(ctx, user_extensions_root, registry_root, dry_run)
   local depended_on = {}
   for _, plugin in pairs(ctx.available) do

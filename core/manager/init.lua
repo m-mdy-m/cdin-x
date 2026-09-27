@@ -1,20 +1,4 @@
 -- CDIN-X extension manager — public facade.
---
--- This module is intentionally thin: it owns the shared mutable state (which
--- extensions exist, which are loaded, the disabled/lock state) and wires
--- together the submodules that each own one concern:
---
---   util      tiny stateless helpers (join/quote/count/...)
---   git       registry clone/pull, sibling-checkout detection
---   state     read/write the disabled+lock state file
---   catalog   scan the three extension roots, merge them by precedence
---   deps      dependency graph / topological load order
---   runtime   dofile a plugin's init.lua, call init/unload, boot sequence
---   lifecycle install / install_local / update / uninstall / enable / disable / clean
---
--- Everything below is the same public API core.x.manager exposed before the
--- split (Manager.install, Manager.list, Manager.bootstrap, ...); callers
--- elsewhere in cdin-x do not need to change.
 local core     = require "core"
 local fs       = require "core.fs"
 local config   = require "core.x.config"
@@ -32,8 +16,6 @@ local Manager = {
   sources = {},
 }
 
--- Shared context handed to every submodule call, so they read/write the
--- manager's live tables instead of each keeping their own copy.
 local ctx = {
   available = Manager.available,
   sources = Manager.sources,
@@ -159,16 +141,28 @@ end
 function Manager.get_readme(name)
   local plugin = Manager.available[name]
   if not plugin then return nil end
+  if plugin._single_file then return nil end
   local path = Util.join(plugin._path, "README.md")
   if fs.is_file(path) then return path end
   return nil
 end
 
 function Manager.open_readme(name)
+  local plugin = Manager.available[name]
+  if not plugin then return false, "unknown extension: " .. tostring(name) end
+
   local path = Manager.get_readme(name)
-  if not path then return false, "README not found" end
-  core.root_view:open_doc(core.open_doc(path))
-  return true
+  if path then
+    core.root_view:open_doc(core.open_doc(path))
+    return true
+  end
+
+  if plugin._single_file then
+    core.log("%s: %s", plugin.name or name, plugin.description or "(no description)")
+    return true
+  end
+
+  return false, "README not found"
 end
 
 function Manager.get_essential_names()

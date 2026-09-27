@@ -1,29 +1,8 @@
--- The "what extensions exist" layer: scans a directory of extensions and
--- merges the three sources (registry, installed, builtin) by precedence
--- into one flat table.
---
--- Three on-disk formats are supported per <category>:
---   <category>/<name>/manifest.lua + init.lua   (folder, split manifest:
---                                                  metadata in manifest.lua,
---                                                  init/unload in init.lua)
---   <category>/<name>/init.lua (no manifest.lua) (folder, merged manifest:
---                                                  metadata plus init/unload
---                                                  all live in init.lua —
---                                                  for multi-module plugins
---                                                  that keep several sibling
---                                                  implementation files but
---                                                  don't need a separate
---                                                  manifest.lua)
---   <category>/<name>.lua                        (single file: manifest
---                                                  fields plus init/unload
---                                                  all live in the one
---                                                  returned table)
--- Any of the three can coexist in the same category — migrate plugins
--- between forms one at a time, nothing forces an all-or-nothing move.
---
--- This module owns no long-lived state itself — it fills whatever `available`
--- / `sources` tables it's given, so Manager can hand it its own ctx.
-local core     = require "core"
+-- Two on-disk formats are supported per <category>:
+--   <category>/<name>/manifest.lua + init.lua   (old: one folder per plugin)
+--   <category>/<name>.lua                        (new: one file per plugin;
+--                                                  manifest fields + init/unload
+--                                                  live in the same table)
 local fs       = require "core.fs"
 local Manifest = require "core.x.manifest"
 local Util     = require "core.x.manager.util"
@@ -42,52 +21,22 @@ function Catalog.scan_root(root, source_name)
       local cat_dir = Util.join(root, category)
       for _, entry in ipairs(fs.list(cat_dir) or {}) do
         if entry.type == "dir" then
+          -- old format: <category>/<name>/manifest.lua + init.lua
           local plugin_dir = Util.join(cat_dir, entry.name)
-          local manifest_file = Util.join(plugin_dir, "manifest.lua")
-          if fs.is_file(manifest_file) then
-            -- folder, split manifest: <category>/<name>/manifest.lua + init.lua
-            local meta, err = Manifest.load(plugin_dir)
-            if meta then
-              meta.name = meta.name or entry.name
-              meta.category = meta.category or category
-              meta.type = meta.type or "plugin"
-              meta.dependencies = meta.dependencies or {}
-              meta._path = plugin_dir
-              meta._single_file = false
-              meta._source = source_name
-              found[meta.name] = meta
-            else
-              core.log("cdin-x: skip %s/%s: %s", category, entry.name, err)
-            end
+          local meta, err = Manifest.load(plugin_dir)
+          if meta then
+            meta.name = meta.name or entry.name
+            meta.category = meta.category or category
+            meta.type = meta.type or "plugin"
+            meta.dependencies = meta.dependencies or {}
+            meta._path = plugin_dir
+            meta._single_file = false
+            meta._source = source_name
+            found[meta.name] = meta
           else
-            -- folder, merged manifest: <category>/<name>/init.lua only —
-            -- metadata plus init/unload all live in init.lua. Read-only
-            -- here (dofile) so scanning never triggers the plugin's own
-            -- init(); Runtime.load_plugin does the real load later via
-            -- the normal folder path (package.path prefix + dofile).
-            local init_file = Util.join(plugin_dir, "init.lua")
-            if fs.is_file(init_file) then
-              local ok, meta = pcall(dofile, init_file)
-              if ok and type(meta) == "table" then
-                meta.name = meta.name or entry.name
-                meta.category = meta.category or category
-                meta.type = meta.type or "plugin"
-                meta.dependencies = meta.dependencies or {}
-                meta._path = plugin_dir
-                meta._single_file = false
-                meta._source = source_name
-                found[meta.name] = meta
-              else
-                core.log("cdin-x: skip %s/%s: %s", category, entry.name, tostring(meta))
-              end
-            else
-              core.log("cdin-x: skip %s/%s: missing manifest.lua and init.lua", category, entry.name)
-            end
+            core.log("cdin-x: skip %s/%s: %s", category, entry.name, err)
           end
         elseif entry.name ~= "manifest.lua" then
-          -- "manifest.lua" directly under a category is the generated
-          -- category index (see scripts/generate-manifest.lua /
-          -- scripts/_scan.lua), not a plugin — skip it here.
           local name = entry.name:match("^(.+)%.lua$")
           if name then
             -- new format: <category>/<name>.lua — manifest fields plus

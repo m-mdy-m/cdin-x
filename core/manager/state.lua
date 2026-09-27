@@ -1,5 +1,3 @@
--- Persistence for the manager's state file: which installed extensions are
--- disabled, and the {version, installed_at} lock record per extension.
 local fs   = require "core.fs"
 local Util = require "core.x.manager.util"
 

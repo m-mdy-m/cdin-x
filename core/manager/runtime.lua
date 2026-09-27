@@ -1,12 +1,3 @@
--- The runtime loading layer: turns a catalog entry into a live Lua module
--- and tracks which modules are currently loaded in ctx.installed.
---
--- Old format (folder): dofile's <path>/init.lua, which itself dofile's
--- manifest.lua and returns a table with .init/.unload.
--- New format (single file, plugin._single_file == true): the catalog
--- already dofile'd <path> once to read the manifest fields; here we
--- dofile it again to get a fresh module table (mirrors the old
--- one-dofile-per-load behavior) and call its .init/.unload directly.
 local core   = require "core"
 local fs     = require "core.fs"
 local config = require "core.x.config"
@@ -81,9 +72,6 @@ function Runtime.unload_plugin(ctx, name)
   return true
 end
 
--- Loads every built-in plus every non-disabled installed extension, in
--- dependency order. Returns true/false; logs (rather than raising) any
--- individual plugin load failure so one bad extension can't block boot.
 function Runtime.load_all(ctx, is_disabled)
   local targets = {}
   for name, plugin in pairs(ctx.available) do
