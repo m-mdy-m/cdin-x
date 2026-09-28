@@ -1,10 +1,3 @@
--- autoreload.lua — single-file core plugin.
--- Manifest fields live at the top level of the returned table, same as
--- before; init/unload replace what used to be a separate init.lua, and
--- the body below (wrapped in do..end so its locals don't leak) replaces
--- what used to be required from impl.lua. The `loaded` guard preserves
--- the original require-once behavior (init.lua used to `require` impl.lua,
--- which Lua's module cache only ever runs once per session).
 local loaded = false
 
 return {
@@ -15,7 +8,7 @@ return {
   license = "MIT",
   category = "core",
   type = "plugin",
-  essential = true,
+  essential = false,
   dependencies = {  },
   min_cdin_version = "0.5.0",
   tags = { "filesystem", "reload" },
