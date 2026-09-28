@@ -26,8 +26,9 @@ function M.plugin_entries()
     for line in pipe:lines() do
       if line ~= "" then
         local plugin_dir = M.dirname(line)
-        local category = plugin_dir and plugin_dir:match("X[/\\]([^/\\]+)[/\\][^/\\]+$")
-        if category then
+        local category = plugin_dir and plugin_dir:match("^X[/\\]([^/\\]+)[/\\]")
+        local has_name_segment = plugin_dir and plugin_dir:match("^X[/\\][^/\\]+[/\\].+")
+        if category and has_name_segment then
           local meta = M.read_manifest(line)
           if meta then
             entries[#entries + 1] = {
@@ -41,29 +42,33 @@ function M.plugin_entries()
     end
     pipe:close()
   end
-
-  -- old format, manifest inlined in init.lua: X/<category>/<name>/init.lua
-  for _, category_entry in ipairs(M.list_dir("X") or {}) do
-    if category_entry.type == "dir" and category_entry.name ~= ".git" then
-      local cat_dir = "X/" .. category_entry.name
-      for _, entry in ipairs(M.list_dir(cat_dir) or {}) do
-        if entry.type == "dir" then
-          local plugin_dir = cat_dir .. "/" .. entry.name
-          if not seen_dirs[plugin_dir] then
-            local init_path = plugin_dir .. "/init.lua"
-            if M.exists(init_path) then
-              local ok, meta = pcall(dofile, init_path)
-              if ok and type(meta) == "table" and type(meta.name) == "string" then
-                entries[#entries + 1] = {
-                  path = init_path, meta = meta,
-                  category = meta.category or category_entry.name,
-                  single_file = false, base = plugin_dir,
-                }
-              end
+  local function scan_for_inlined_plugins(dir, category_name)
+    for _, entry in ipairs(M.list_dir(dir) or {}) do
+      if entry.type == "dir" and entry.name ~= ".git" then
+        local sub_dir = dir .. "/" .. entry.name
+        if not seen_dirs[sub_dir] then
+          local init_path = sub_dir .. "/init.lua"
+          if M.exists(init_path) then
+            local ok, meta = pcall(dofile, init_path)
+            if ok and type(meta) == "table" and type(meta.name) == "string" then
+              entries[#entries + 1] = {
+                path = init_path, meta = meta,
+                category = meta.category or category_name,
+                single_file = false, base = sub_dir,
+              }
+              seen_dirs[sub_dir] = true
             end
+          else
+            scan_for_inlined_plugins(sub_dir, category_name)
           end
         end
       end
+    end
+  end
+
+  for _, category_entry in ipairs(M.list_dir("X") or {}) do
+    if category_entry.type == "dir" and category_entry.name ~= ".git" then
+      scan_for_inlined_plugins("X/" .. category_entry.name, category_entry.name)
     end
   end
 
@@ -134,30 +139,60 @@ function M.category_from_manifest(path)
   return category or "unknown"
 end
 
+-- Is this path a directory?
+function M.is_dir(path)
+  if SEP == "\\" then
+    local p = path:gsub("'", "''")
+    local handle = io.popen('powershell -NoProfile -Command "if (Test-Path -LiteralPath \''
+      .. p .. '\' -PathType Container) { \'yes\' }"')
+    local out = handle and handle:read("*a") or ""
+    if handle then handle:close() end
+    return out:find("yes") ~= nil
+  end
+  local handle = io.popen('test -d "' .. path .. '" && echo yes')
+  local out = handle and handle:read("*a") or ""
+  if handle then handle:close() end
+  return out:find("yes") ~= nil
+end
+
+-- Does this path exist at all, file or directory?
 function M.exists(path)
   local f = io.open(path, "rb")
   if f then f:close(); return true end
-  return false
+  return M.is_dir(path)
 end
 
+-- List one directory as { name, type = "dir"|"file" }.
 function M.list_dir(path)
   local results = {}
-  local handle = io.popen('ls "' .. path .. '" 2>/dev/null')
+  local command
+  if SEP == "\\" then
+    local p = path:gsub("'", "''")
+    command = 'powershell -NoProfile -Command "Get-ChildItem -LiteralPath \'' .. p ..
+      '\' -Force | ForEach-Object { if ($_.PSIsContainer) { \'DIR \' + $_.Name } else { \'FILE \' + $_.Name } }"'
+  else
+    command = "ls -A " .. shell_quote(path) .. " 2>/dev/null"
+  end
+
+  local handle = io.popen(command)
   if not handle then return results end
   for line in handle:lines() do
-    local full = path .. "/" .. line
-    local attr = io.popen('stat -c "%F" "' .. full .. '" 2>/dev/null'):read("*a"):gsub("%s+", "")
-    table.insert(results, { name = line, type = attr == "directory" and "dir" or "file" })
+    local kind, name = line:match("^(%u+)%s+(.+)$")
+    if name then
+      results[#results + 1] = { name = name, type = (kind == "DIR") and "dir" or "file" }
+    end
   end
   handle:close()
   return results
 end
 
 function M.list_files_recursive(dir)
-  local command
+  local command, strip_prefix
   if SEP == "\\" then
-    command = 'powershell -NoProfile -Command "Get-ChildItem -Path '
-      .. dir .. ' -Recurse -File | ForEach-Object { $_.FullName }"'
+    local cwd = (io.popen("cd"):read("*a") or ""):gsub("[\r\n]", "")
+    strip_prefix = cwd:gsub("\\", "/"):gsub("/+$", "") .. "/"
+    command = 'powershell -NoProfile -Command "Get-ChildItem -LiteralPath \''
+      .. dir:gsub("'", "''") .. '\' -Recurse -File | ForEach-Object { $_.FullName }"'
   else
     command = "find " .. shell_quote(dir) .. " -type f -print"
   end
@@ -167,7 +202,11 @@ function M.list_files_recursive(dir)
   local results = {}
   for line in pipe:lines() do
     if line ~= "" then
-      results[#results + 1] = (line:gsub("\\", "/"))
+      local path = line:gsub("\\", "/")
+      if strip_prefix and path:sub(1, #strip_prefix) == strip_prefix then
+        path = path:sub(#strip_prefix + 1)
+      end
+      results[#results + 1] = path
     end
   end
   pipe:close()

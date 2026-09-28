@@ -36,9 +36,13 @@ for name in pairs(plugins) do names[#names + 1] = name end
 table.sort(names)
 
 local lines = {
-  "-- Generated catalog index. Multi-module plugins use manifest.lua",
-  "-- (inside their own directory); single-file plugins and themes carry",
-  "-- the same manifest fields inline in their one .lua file.",
+  "-- Generated catalog index - do not edit by hand; run",
+  "-- `lua scripts/generate-manifest.lua` instead.",
+  "--",
+  "-- Every plugin carries its manifest inline: in init.lua for a",
+  "-- directory plugin, in the returned table for a single-file one or a",
+  "-- theme. There is no separate manifest.lua.",
+  "--",
   "-- `files` on every entry lists that entry's files relative to the repo",
   "-- root, so callers can fetch them individually without cloning.",
   "return {",

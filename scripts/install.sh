@@ -24,50 +24,79 @@ fi
 mkdir -p "$CDIN_DIR/data/core/x" "$CDIN_DIR/data/X/core" "$CDIN_DIR/data/fonts" "$CDIN_DIR/data/X/themes"
 
 if [ "$SYMLINK" = "1" ]; then
-  # Development mode: symlinks so cdin-x changes are immediately reflected
-  rm -f "$CDIN_DIR/data/core/x"
+  rm -rf "$CDIN_DIR/data/core/x"
   ln -sf "$(pwd)/core" "$CDIN_DIR/data/core/x"
-  rm -f "$CDIN_DIR/data/X"
+  rm -rf "$CDIN_DIR/data/X"
   ln -sf "$(pwd)/X" "$CDIN_DIR/data/X"
-  rm -f "$CDIN_DIR/data/fonts"
-  ln -sf "$(pwd)/fonts" "$CDIN_DIR/data/fonts"
+
+  if [ -d fonts ] && [ -n "$(ls -A fonts 2>/dev/null)" ]; then
+    rm -rf "$CDIN_DIR/data/fonts"
+    ln -sf "$(pwd)/fonts" "$CDIN_DIR/data/fonts"
+    echo "  data/fonts   -> $(pwd)/fonts"
+  elif [ ! -d "$CDIN_DIR/data/fonts" ]; then
+    echo "⚠ no fonts found: cdin-x/fonts/ is missing and $CDIN_DIR/data/fonts/ does not exist." >&2
+  else
+    echo "  data/fonts   left alone (cdin-x has no fonts/ to link)"
+  fi
+
   echo "CDIN-X installed (symlink mode): $CDIN_DIR"
   echo "  data/core/x -> $(pwd)/core"
   echo "  data/X       -> $(pwd)/X"
-  echo "  data/fonts   -> $(pwd)/fonts"
 else
   # Production mode: copy files
   mkdir -p "$CDIN_DIR/data/core/x"
   cp -R core/. "$CDIN_DIR/data/core/x/"
 
+  # Is this file an essential manifest?
+  is_essential() {
+    grep -q "essential[[:space:]]*=[[:space:]]*true" "$1" 2>/dev/null
+  }
+
   for dir in X/core/*/; do
+    [ -d "$dir" ] || continue
     name="$(basename "$dir")"
-    manifest="$dir/manifest.lua"
-    if [ -f "$manifest" ] && grep -q "essential[[:space:]]*=[[:space:]]*true" "$manifest"; then
+    essential=0
+    if [ -f "$dir/manifest.lua" ] && is_essential "$dir/manifest.lua"; then
+      essential=1
+    elif [ -f "$dir/init.lua" ] && is_essential "$dir/init.lua"; then
+      essential=1
+    fi
+    if [ "$essential" = "1" ]; then
       rm -rf "$CDIN_DIR/data/X/core/$name"
       mkdir -p "$CDIN_DIR/data/X/core/$name"
       cp -R "$dir." "$CDIN_DIR/data/X/core/$name/"
     fi
   done
 
+  # Single-file core plugins (X/core/<name>.lua) can be essential too.
+  for file in X/core/*.lua; do
+    [ -f "$file" ] || continue
+    name="$(basename "$file" .lua)"
+    if is_essential "$file"; then
+      mkdir -p "$CDIN_DIR/data/X/core"
+      cp "$file" "$CDIN_DIR/data/X/core/$name.lua"
+    fi
+  done
+
   for dir in X/themes/*/; do
+    [ -d "$dir" ] || continue
     name="$(basename "$dir")"
     theme_file="$dir/theme.lua"
-    if [ -f "$theme_file" ] && grep -q "essential[[:space:]]*=[[:space:]]*true" "$theme_file"; then
+    if [ -f "$theme_file" ] && is_essential "$theme_file"; then
       rm -rf "$CDIN_DIR/data/X/themes/$name"
       mkdir -p "$CDIN_DIR/data/X/themes/$name"
       cp "$theme_file" "$CDIN_DIR/data/X/themes/$name/theme.lua"
     fi
   done
 
-  rm -rf "$CDIN_DIR/data/fonts"
-  mkdir -p "$CDIN_DIR/data/fonts"
   if [ -d fonts ] && [ -n "$(ls -A fonts 2>/dev/null)" ]; then
+    rm -rf "$CDIN_DIR/data/fonts"
+    mkdir -p "$CDIN_DIR/data/fonts"
     cp -R fonts/. "$CDIN_DIR/data/fonts/"
-  else
-    echo "⚠ cdin-x/fonts/ is missing or empty — skipping font install." >&2
+  elif [ ! -d "$CDIN_DIR/data/fonts" ]; then
+    echo "⚠ no fonts found: cdin-x/fonts/ is missing and $CDIN_DIR/data/fonts/ does not exist." >&2
     echo "  cdin will fail to start until data/fonts/ contains:" >&2
-    echo "  font.ttf, icons.ttf, monospace.ttf, fallback.ttf, emoji.ttf" >&2
+    echo "  font.ttf, icons.ttf, monospace.ttf, fallback.ttf, emoji.ttf"
   fi
 
   echo "CDIN-X runtime installed into: $CDIN_DIR"
