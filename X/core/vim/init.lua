@@ -1,32 +1,86 @@
--- Manifest fields (name, version, description, ...) live inline below --
--- this used to be a separate manifest.lua that init.lua dofile'd; now
--- it's just the top of the returned table, same as any single-file
--- plugin. Everything else in this directory (the sibling .lua modules
--- this file requires) is unchanged.
+-- Vim-style modal editing and the ex command line.
+--
+-- Vim core owns *only* vim's own vocabulary — motions, operators, the
+-- ex-commands for files, the shell escape, the mode pill. Anything that
+-- needs another plugin's behaviour is an integration under
+-- X/integration/vim/, and extends vim through the single registry in
+-- registry.lua (ex-commands, the Ctrl+W map, the "g" map, single keys,
+-- and events). Nothing in this directory may require another X plugin.
+--
+-- Layout:
+--   init.lua        inline manifest + the one load point
+--   registry.lua    the extension points integrations register into
+--   commands.lua    vim's own cdin commands
+--   keymap.lua      vim's own non-modal key bindings
+--   api.lua         legacy alias for registry, kept for old plugins
+--   ex/             the ":" command line, split by concern
+--   shell/          running shell commands and showing their output
+--   vimode/         modal editing: keys, mode state, status pill
+--
+-- Integrations live in X/integration/vim/: vim-tab, vim-window,
+-- vim-search, vim-treeview, vim-git, vim-menu, vim-plugin-manager.
+--
+-- Note there is no manifest.lua: the inline table below is the single
+-- source of truth. The sibling modules are required inside init() rather
+-- than at the top of this file on purpose — the extension catalog reads
+-- this file with dofile() to discover the manifest, so a top-level
+-- require would drag the whole subtree in, running its side effects,
+-- merely to look the plugin up.
 local M = {
   name = "vim",
-  version = "0.1.0",
-  description = "Vim-style modal editing, commands, file menu and shell integration",
+  version = "0.2.0",
+  description = "Vim-style modal editing and command-line integration",
   author = "cdin Team",
   license = "MIT",
   category = "core",
   type = "plugin",
   essential = true,
-  dependencies = { "git" },
+  dependencies = {},
   min_cdin_version = "0.5.0",
   tags = { "essential", "editor", "vim", "input" },
 }
 M.config = { vim_mode_enabled = true }
 
-local loaded = false
+local loaded = nil
+
 function M.init(core, config)
   if loaded then return end
-  loaded = true
-  require "X.core.vim.ex"
-  require "X.core.vim.fmenu"
-  require "X.core.vim.shell"
-  require "X.core.vim.vimode"
+
+  local ex       = require "X.core.vim.ex"
+  local vimode   = require "X.core.vim.vimode"
+  local commands = require "X.core.vim.commands"
+  local keymap   = require "X.core.vim.keymap"
+  local shell_commands = require "X.core.vim.shell.commands"
+  local shell_keymap   = require "X.core.vim.shell.keymap"
+
+  -- Order matters: the commands and keys have to exist before anything
+  -- can trigger them, and ex must have its own commands registered
+  -- before the first ":w" can be typed.
+  commands.register()
+  keymap.register()
+  shell_commands.register()
+  shell_keymap.register()
+  ex.register()
+  vimode.register()
+
+  loaded = {
+    ex = ex, vimode = vimode, commands = commands, keymap = keymap,
+    shell_commands = shell_commands, shell_keymap = shell_keymap,
+  }
+
   core.log("Vim extension loaded")
 end
-function M.unload() end
+
+function M.unload()
+  if not loaded then return end
+  -- Unwind in the reverse order of registration.
+  loaded.vimode.unregister()
+  loaded.ex.unregister()
+  loaded.shell_keymap.unregister()
+  loaded.shell_commands.unregister()
+  loaded.keymap.unregister()
+  loaded.commands.unregister()
+  loaded = nil
+end
+
 return M

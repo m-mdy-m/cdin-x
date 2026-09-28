@@ -1,0 +1,113 @@
+-- Shell execution as a capability.
+--
+-- This is the only part of vim mode that is not really about editing:
+-- ":!cmd" needs somewhere to run a command and somewhere to put the
+-- output. Integrations reuse it rather than each writing their own
+-- io.popen wrapper (vim-git runs every git command through here).
+--
+-- Layout of this directory:
+--   init.lua     capture / run / run_in_buffer / platform
+--   commands.lua the vim-shell:* commands
+--   keymap.lua   key bindings for those commands
+--
+-- The commands and bindings live in their own files, and register /
+-- unregister are explicit, so disabling the shell leaves nothing behind.
+local core   = require "core"
+local Doc    = require "core.doc"
+local config = require "core.config"
+
+local M = {}
+
+M.IS_WIN = PATHSEP == "\\"
+
+if config.shell_win         == nil then config.shell_win         = "cmd" end
+if config.shell_capture_win == nil then config.shell_capture_win = "cmd" end
+
+-- ── quoting ──────────────────────────────────────────────────────────────
+function M.shell_quote(s)
+  if M.IS_WIN then
+    return '"' .. s:gsub('"', '""') .. '"'
+  end
+  return "'" .. s:gsub("'", "'\\''") .. "'"
+end
+
+function M.capture(cmd)
+  local full
+  if not M.IS_WIN then
+    full = cmd .. " 2>&1"
+  elseif config.shell_capture_win == "powershell" then
+    full = 'powershell -NoProfile -NonInteractive -Command "'
+        .. cmd:gsub('"', '\\"') .. ' 2>&1"'
+  else
+    full = 'cmd /c "' .. cmd:gsub('"', '""') .. '" 2>&1'
+  end
+
+  local ok, fp = pcall(io.popen, full, "r")
+  if not ok or not fp then
+    return nil, ("shell: could not launch: %s"):format(cmd)
+  end
+  local out     = fp:read("*a")
+  local success = fp:close()
+  if success == false then
+    return out or "", ("shell: command exited with error: %s"):format(cmd)
+  end
+  return out or "", nil
+end
+
+-- Fire and forget — no buffer, no waiting.
+function M.run(cmd)
+  system.exec(cmd)
+end
+
+function M.run_in_buffer(cmd)
+  core.log("shell: running %s", cmd)
+
+  local output, err = M.capture(cmd)
+  local header = ("-- :!%s\n-- %s\n\n"):format(cmd, os.date("%Y-%m-%d %H:%M:%S"))
+  local content = header .. (output or "") .. (err and ("\n\n-- [error] " .. err) or "")
+
+  local doc = Doc()
+  doc:text_input(content)
+  doc:set_selection(1, 1)
+  doc.name = ":!" .. cmd
+  function doc:get_name() return self.name end
+  core.root_view:open_doc(doc)
+
+  if err then core.error("shell: %s", err) else core.log("shell: done") end
+end
+
+-- Ask for a command line, then run what was typed. Bound to
+-- vim-shell:run-custom.
+function M.prompt_and_run()
+  core.command_view:enter(":! shell command", function(cmd)
+    if cmd == "" then core.error("shell: empty command"); return end
+    M.run_in_buffer(cmd)
+  end, function() return {} end)
+  core.command_view:set_text("")
+end
+
+-- Open a separate terminal window. Non-blocking: cdin keeps running.
+function M.open_terminal()
+  if not M.IS_WIN then
+    local term = os.getenv("TERMINAL") or os.getenv("TERM_PROGRAM") or "xterm"
+    system.exec(term)
+    return
+  end
+  local shell = config.shell_win
+  if shell == "powershell" then
+    system.exec("start powershell -NoExit")
+  elseif shell == "pwsh" then
+    system.exec("start pwsh -NoExit")
+  else
+    system.exec("start cmd")
+  end
+end
+
+function M.platform()
+  if M.IS_WIN then return "windows" end
+  local out = M.capture("uname -s") or ""
+  if out:find("Darwin") then return "macos" end
+  return "linux"
+end
+
+return M
