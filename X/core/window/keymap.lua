@@ -1,8 +1,11 @@
+-- Window key bindings: Alt+hjkl to move between panes, Ctrl+\ to split,
+-- Alt+arrows to resize. Register/unregister are explicit so disabling the
+-- plugin gives the strokes back.
 local keymap = require "core.input.keymap"
 
-require "X.core.window.commands"
+local M = {}
 
-keymap.add({
+local MAP = {
   -- ── focus (Alt + hjkl, like VEX) ─────────────────────────────────────────
   ["alt+h"] = "window:focus-left",
   ["alt+j"] = "window:focus-down",
@@ -10,6 +13,7 @@ keymap.add({
   ["alt+l"] = "window:focus-right",
   ["alt+w"] = "window:focus-next",
   ["alt+p"] = "window:focus-prev-window",
+
   -- ── split ─────────────────────────────────────────────────────────────────
   ["ctrl+\\"]       = "window:vsplit",
   ["ctrl+shift+\\"] = "window:split",
@@ -24,6 +28,14 @@ keymap.add({
   ["alt+up"]    = "window:increase-height",
   ["alt+down"]  = "window:decrease-height",
   ["alt+="]     = "window:equalize",
-})
+}
 
-return require "X.core.window.manager"
+function M.register()
+  keymap.add(MAP, true)
+end
+
+function M.unregister()
+  keymap.remove(MAP)
+end
+
+return M
