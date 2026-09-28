@@ -1,29 +1,55 @@
--- Manifest fields (name, version, description, ...) live inline below --
--- this used to be a separate manifest.lua that init.lua dofile'd; now
--- it's just the top of the returned table, same as any single-file
--- plugin. Everything else in this directory (the sibling .lua modules
--- this file requires) is unchanged.
+-- File tree sidebar with navigation and filesystem actions.
+--
+--   treeview_impl.lua  the view: drawing, cursor, expansion
+--   commands.lua       the eighteen treeview commands
+--   keymap.lua         its key bindings
+--   api.lua            the provider registry integrations extend
+--   cache.lua          tree item cache
+--   readonly.lua       read-only file cache (badges)
+--
+-- The treeview knows nothing about git or any other capability: it exposes
+-- a generic badge/refresh provider registry (api.lua) that integrations
+-- fill in — see X/integration/git-treeview.
+--
+-- The manifest is inline (there is no manifest.lua) and everything is
+-- required inside init(), so the extension catalog can dofile() this file
+-- to read the manifest without splitting a pane into the user's layout.
 local M = {
   name = "treeview",
-  version = "0.1.0",
-  description = "File tree sidebar with navigation, Git state and filesystem actions",
+  version = "0.2.0",
+  description = "File tree sidebar with navigation and filesystem actions",
   author = "cdin Team",
   license = "MIT",
   category = "core",
   type = "plugin",
-  essential = true,
-  dependencies = { "git" },
+  essential = false,
+  dependencies = {},
   min_cdin_version = "0.5.0",
   tags = { "essential", "ui", "navigation", "filesystem" },
 }
 M.config = {}
 
 local loaded = false
+
 function M.init(core, config)
   if loaded then return end
   loaded = true
-  require "X.core.treeview.treeview_impl"
+
+  local view = require "X.core.treeview.treeview_impl"
+  core.treeview = view
+
+  require("X.core.treeview.commands").register(view)
+  require("X.core.treeview.keymap").register()
+
   core.log("Treeview extension loaded")
 end
-function M.unload() end
+
+function M.unload()
+  if not loaded then return end
+  require("X.core.treeview.keymap").unregister()
+  require("X.core.treeview.commands").unregister()
+  require("core").treeview = nil
+  loaded = false
+end
+
 return M
