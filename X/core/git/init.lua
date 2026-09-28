@@ -1,40 +1,42 @@
--- git: VCS status/exec/commands, moved out of cdin core
--- (was data/core/git/{init,exec,status,commands}.lua).
+-- Git/VCS support, moved out of cdin core (was data/core/git/).
 --
 -- data/core is runtime-only; a plain-text editor works with zero
--- knowledge of git, so this whole module now lives here as a plugin.
+-- knowledge of git, so this whole capability now lives here as a plugin.
 --
--- Two integration points on core stay in cdin (they are tiny, generic
--- hooks, not git-specific code):
---   core.register_vcs_provider(provider)  -- see project.lua / statusview.lua
---     provider.is_ignored(abs_path)        -> boolean
---     provider.refresh_ignored_now()       -> nil (best-effort, pcall'd by caller)
---     provider.status                      -> table read by statusview for the
---                                              branch/ahead/behind/dirty pill
--- If this plugin is never loaded, both call sites degrade to "no vcs info"
--- instead of erroring.
+-- This file is only the manifest and the load point. The module consumers
+-- use is api.lua — see the comment there for why it is not this file.
+--
+-- The manifest is inline rather than in a separate manifest.lua, and
+-- nothing is required at the top of the file, so the extension catalog
+-- can dofile() this to read the manifest without running any of the
+-- plugin's code.
+local M = {
+  name = "git",
+  version = "0.2.0",
+  description = "Git status, ignore rules and shared shell recipes",
+  author = "cdin Team",
+  license = "MIT",
+  category = "core",
+  type = "plugin",
+  essential = false,
+  dependencies = {},
+  min_cdin_version = "0.5.0",
+  tags = { "git", "vcs", "status" },
+}
 
-local core     = require "core"
-local exec     = require "X.core.git.exec"
-local status   = require "X.core.git.status"
-local commands = require "X.core.git.commands"
+local loaded = false
 
-local M = {}
+function M.init(core, config)
+  if loaded then return end
+  loaded = true
+  require("X.core.git.api").register()
+  core.log("Git extension loaded")
+end
 
-M.exe            = exec.exe
-M.exe_cwd        = exec.exe_cwd
-M.popen          = exec.popen
-M.normalize_path = exec.normalize_path
-M.IS_WIN         = exec.IS_WIN
-M.status         = status
-M.commands       = commands
-
-if core.register_vcs_provider then
-  core.register_vcs_provider({
-    is_ignored          = status.is_ignored,
-    refresh_ignored_now = status.refresh_ignored_now,
-    status               = status,
-  })
+function M.unload()
+  if not loaded then return end
+  require("X.core.git.api").unregister()
+  loaded = false
 end
 
 return M

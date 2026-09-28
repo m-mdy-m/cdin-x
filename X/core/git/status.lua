@@ -85,14 +85,6 @@ function M.refresh_ignored_now()
 end
 
 function M.refresh()
-  if not config.treeview_git_enabled then
-    M.status, M.root = {}, nil
-    M.branch, M.has_remote = nil, false
-    M.ahead, M.behind, M.staged, M.unstaged, M.conflicts = 0, 0, 0, 0, 0
-    M.repo_dirty = false
-    return
-  end
-
   local dir = project_dir()
   local gc  = git.exe_with_dir(dir)
   if not gc then
@@ -205,7 +197,7 @@ end
 function M.thread()
   while true do
     core.try(M.refresh)
-    coroutine.yield(config.treeview_git_update_rate or 4)
+    coroutine.yield(config.git_update_rate or 4)
   end
 end
 
