@@ -1,20 +1,30 @@
--- Metadata (name, version, description, author, license, category,
--- essential, dependencies, tags, etc.) lives in manifest.lua, which the
--- catalog/scanner also reads. This file only adds what's specific to
--- actually running the plugin: its config table and init/unload hooks.
-local function plugin_dir()
-  local src = debug.getinfo(1, "S").source:match("^@(.+)$")
-  return src:match("^(.*)[/\\][^/\\]+$")
-end
-
-local M = dofile(plugin_dir() .. "/manifest.lua")
+local M = {
+  name = "theme_switcher",
+  version = "0.2.0",
+  description = "Switch between installed CDIN themes",
+  author = "cdin Team",
+  license = "MIT",
+  category = "optional",
+  type = "plugin",
+  essential = false,
+  dependencies = {},
+  min_cdin_version = "0.5.0",
+  tags = { "theme", "ui" },
+}
 M.config = {}
 
 local loaded = false
-function M.init(core, config)
+
+function M.init()
   if loaded then return end
   loaded = true
-  require "X.optional.theme_switcher.impl"
+  require("X.optional.theme_switcher.impl").register()
 end
-function M.unload() end
+
+function M.unload()
+  if not loaded then return end
+  require("X.optional.theme_switcher.impl").unregister()
+  loaded = false
+end
+
 return M

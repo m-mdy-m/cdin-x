@@ -1,20 +1,30 @@
--- Metadata (name, version, description, author, license, category,
--- essential, dependencies, tags, etc.) lives in manifest.lua, which the
--- catalog/scanner also reads. This file only adds what's specific to
--- actually running the plugin: its config table and init/unload hooks.
-local function plugin_dir()
-  local src = debug.getinfo(1, "S").source:match("^@(.+)$")
-  return src:match("^(.*)[/\\][^/\\]+$")
-end
-
-local M = dofile(plugin_dir() .. "/manifest.lua")
+local M = {
+  name = "unicode_inspect",
+  version = "0.2.0",
+  description = "Show the codepoints of the selection or the character at the caret",
+  author = "cdin Team",
+  license = "MIT",
+  category = "optional",
+  type = "plugin",
+  essential = false,
+  dependencies = {},
+  min_cdin_version = "0.5.0",
+  tags = { "unicode", "text", "debug" },
+}
 M.config = {}
 
 local loaded = false
-function M.init(core, config)
+
+function M.init()
   if loaded then return end
   loaded = true
-  require "X.optional.unicode_inspect.impl"
+  require("X.optional.unicode_inspect.impl").register()
 end
-function M.unload() end
+
+function M.unload()
+  if not loaded then return end
+  require("X.optional.unicode_inspect.impl").unregister()
+  loaded = false
+end
+
 return M
