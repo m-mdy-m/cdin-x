@@ -1,13 +1,56 @@
--- Two on-disk formats are supported per <category>:
---   <category>/<name>/manifest.lua + init.lua   (old: one folder per plugin)
---   <category>/<name>.lua                        (new: one file per plugin;
---                                                  manifest fields + init/unload
---                                                  live in the same table)
 local fs       = require "core.fs"
 local Manifest = require "core.x.manifest"
 local Util     = require "core.x.manager.util"
 
 local Catalog = {}
+
+-- A directory counts as a plugin root if it carries either manifest form.
+local function is_plugin_dir(dir)
+  return fs.is_file(dir .. "/manifest.lua") or fs.is_file(dir .. "/init.lua")
+end
+
+local function record(meta, name, path, relpath, category, single_file, source, found)
+  meta.name = meta.name or name
+  meta.category = meta.category or category
+  meta.type = meta.type or "plugin"
+  meta.dependencies = meta.dependencies or {}
+  meta._path = path
+  meta._relpath = relpath
+  meta._single_file = single_file
+  meta._source = source
+  found[meta.name] = meta
+end
+
+local function scan_dir(dir, relpath, category, source, found)
+  for _, entry in ipairs(fs.list(dir) or {}) do
+    if entry.type == "dir" and entry.name ~= ".git" then
+      local sub_dir = Util.join(dir, entry.name)
+      local sub_rel = relpath == "" and entry.name or (relpath .. "/" .. entry.name)
+      if is_plugin_dir(sub_dir) then
+        local meta, err = Manifest.load(sub_dir)
+        if meta then
+          record(meta, entry.name, sub_dir, sub_rel, category, false, source, found)
+        else
+          core.log("cdin-x: skip %s: %s", sub_rel, err)
+        end
+      else
+        -- not a plugin: a grouping directory, keep descending
+        scan_dir(sub_dir, sub_rel, category, source, found)
+      end
+    elseif entry.type == "file" and entry.name ~= "manifest.lua" then
+      local name = entry.name:match("^(.+)%.lua$")
+      if name then
+        local file_path = Util.join(dir, entry.name)
+        local ok, meta = pcall(dofile, file_path)
+        if ok and type(meta) == "table" then
+          record(meta, name, file_path, relpath .. "/" .. entry.name, category, true, source, found)
+        else
+          core.log("cdin-x: skip %s: %s", relpath .. "/" .. entry.name, tostring(meta))
+        end
+      end
+    end
+  end
+end
 
 function Catalog.scan_root(root, source_name)
   local found = {}
@@ -16,48 +59,9 @@ function Catalog.scan_root(root, source_name)
   end
 
   for _, category_entry in ipairs(fs.list(root) or {}) do
-    local category = category_entry.name
-    if category_entry.type == "dir" and category ~= ".git" then
-      local cat_dir = Util.join(root, category)
-      for _, entry in ipairs(fs.list(cat_dir) or {}) do
-        if entry.type == "dir" then
-          -- old format: <category>/<name>/manifest.lua + init.lua
-          local plugin_dir = Util.join(cat_dir, entry.name)
-          local meta, err = Manifest.load(plugin_dir)
-          if meta then
-            meta.name = meta.name or entry.name
-            meta.category = meta.category or category
-            meta.type = meta.type or "plugin"
-            meta.dependencies = meta.dependencies or {}
-            meta._path = plugin_dir
-            meta._single_file = false
-            meta._source = source_name
-            found[meta.name] = meta
-          else
-            core.log("cdin-x: skip %s/%s: %s", category, entry.name, err)
-          end
-        elseif entry.name ~= "manifest.lua" then
-          local name = entry.name:match("^(.+)%.lua$")
-          if name then
-            -- new format: <category>/<name>.lua — manifest fields plus
-            -- init/unload all live in the one returned table.
-            local file_path = Util.join(cat_dir, entry.name)
-            local ok, meta = pcall(dofile, file_path)
-            if ok and type(meta) == "table" then
-              meta.name = meta.name or name
-              meta.category = meta.category or category
-              meta.type = meta.type or "plugin"
-              meta.dependencies = meta.dependencies or {}
-              meta._path = file_path
-              meta._single_file = true
-              meta._source = source_name
-              found[meta.name] = meta
-            else
-              core.log("cdin-x: skip %s/%s: %s", category, entry.name, tostring(meta))
-            end
-          end
-        end
-      end
+    if category_entry.type == "dir" and category_entry.name ~= ".git" then
+      scan_dir(Util.join(root, category_entry.name), category_entry.name,
+               category_entry.name, source_name, found)
     end
   end
   return found

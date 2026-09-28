@@ -1,4 +1,4 @@
-local core   = require "core"
+﻿local core   = require "core"
 local fs     = require "core.fs"
 local config = require "core.x.config"
 local Util   = require "core.x.manager.util"

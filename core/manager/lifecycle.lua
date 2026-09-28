@@ -6,8 +6,13 @@ local Runtime  = require "core.x.manager.runtime"
 
 local Lifecycle = {}
 
+-- Where a plugin is copied inside the user's extension store.
 local function install_path_for(config, plugin)
-  local base = Util.join(config.extension_dir, plugin.category, plugin.name)
+  local rel = plugin._relpath
+  if not rel or rel == "" then
+    rel = (plugin.category or "unknown") .. "/" .. (plugin.name or "unknown")
+  end
+  local base = Util.join(config.extension_dir, rel)
   if plugin._single_file then
     return base .. ".lua"
   end
