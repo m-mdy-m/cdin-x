@@ -1,5 +1,5 @@
 local fs   = require "core.fs"
-local Util = require "core.x.manager.util"
+local Util = require "cdinx.manager.util"
 
 local State = {}
 

@@ -1,7 +1,7 @@
 -- CDIN-X Plugin Manager UI.
 local core    = require "core"
 local command = require "core.input.command"
-local Manager = require "core.x.manager"
+local Manager = require "cdinx.manager"
 
 local Command = {}
 

@@ -1,8 +1,8 @@
-﻿local core   = require "core"
+local core   = require "core"
 local fs     = require "core.fs"
-local config = require "core.x.config"
-local Util   = require "core.x.manager.util"
-local Deps   = require "core.x.manager.deps"
+local config = require "cdinx.config"
+local Util   = require "cdinx.manager.util"
+local Deps   = require "cdinx.manager.deps"
 
 local Runtime = {}
 
@@ -11,6 +11,10 @@ local function is_runtime_plugin(plugin)
 end
 
 function Runtime.load_plugin(ctx, name)
+  -- The host already initialised this one. Loading it again would run its
+  -- registrations a second time; see collect_provided in manager/init.lua.
+  if Deps.is_provided(ctx, name) then return true end
+
   local plugin = ctx.available[name]
   if not plugin then return false, "unknown extension: " .. name end
   if plugin.type == "theme" then return true end
@@ -75,7 +79,9 @@ end
 function Runtime.load_all(ctx, is_disabled)
   local targets = {}
   for name, plugin in pairs(ctx.available) do
-    if plugin._source == "builtin" then
+    if Deps.is_provided(ctx, name) then
+      -- already running in the host
+    elseif plugin._source == "builtin" then
       targets[#targets + 1] = name
     elseif plugin._source == "installed" and not is_disabled(name) then
       targets[#targets + 1] = name
@@ -90,7 +96,7 @@ function Runtime.load_all(ctx, is_disabled)
 
   for _, name in ipairs(ordered) do
     local plugin = ctx.available[name]
-    if is_runtime_plugin(plugin) then
+    if is_runtime_plugin(plugin) and not Deps.is_provided(ctx, name) then
       local ok, load_err = Runtime.load_plugin(ctx, name)
       if not ok then
         core.log("cdin-x: failed to load %s: %s", name, load_err)

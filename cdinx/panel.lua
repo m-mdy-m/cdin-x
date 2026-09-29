@@ -6,8 +6,8 @@ local config  = require "core.config"
 local keymap  = require "core.input.keymap"
 local style   = require "core.style"
 local View    = require "core.views.view"
-local Manager = require "core.x.manager"
-local Command = require "core.x.command"
+local Manager = require "cdinx.manager"
+local Command = require "cdinx.command"
 
 config.pluginmanager_size = 260 * SCALE
 
