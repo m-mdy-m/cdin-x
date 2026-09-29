@@ -122,18 +122,21 @@ custom:
     - path: "/.gix/config"
     - path: "/.pre-commit-config.yaml"
 
-    # Core system
-    - path: "/core/init.lua"
-    - path: "/core/manager.lua"
-    - path: "/core/config.lua"
-    - path: "/core/manifest.lua"
-    - path: "/core/command.lua"
-    - path: "/core/session_bootstrap.lua"
+    # cdinx/ — the extension manager
+    - path: "/cdinx/init.lua"
+    - path: "/cdinx/config.lua"
+    - path: "/cdinx/manifest.lua"
+    - path: "/cdinx/command.lua"
+    - path: "/cdinx/panel.lua"
+    - path: "/plugins/cdin-x/init.lua"
 
     # X/ — Essential plugins (non-removable)
-    - path: "/X/core/core/manifest.lua"
-    - path: "/X/core/vim/manifest.lua"
-    - path: "/X/core/treeview/manifest.lua"
+    - path: "/X/core/vim/init.lua"
+
+    # X/ — Optional workflow plugins (command palette, file finders, modules)
+    - path: "/X/core/palette/init.lua"
+    - path: "/X/core/finder/init.lua"
+    - path: "/X/core/modules/init.lua"
 
     # X/ — Generated catalog index
     - path: "/X/manifest.lua"
@@ -142,10 +145,10 @@ custom:
     - path: "/X/syntax/lua.lua"
 
     # X/ — Extra (non-essential) plugins
-    - path: "/X/extras/theme_switcher/manifest.lua"
+    - path: "/X/optional/theme_switcher/init.lua"
 
     # X/ — Themes
-    - path: "/X/themes/default.lua"
+    - path: "/X/themes/default/theme.lua"
 
     # Examples
     - path: "/examples/README.md"
@@ -171,7 +174,8 @@ custom:
     - path: "/scripts/plugin-list.lua"
     - path: "/scripts/validate.lua"
     - path: "/scripts/generate-manifest.lua"
-    - path: "/scripts/install.sh"
+    - path: "/scripts/install.py"
+    - path: "/scripts/bundle.py"
     - path: "/scripts/README.md"
 
     # GitHub templates & workflows
