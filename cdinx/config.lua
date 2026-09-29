@@ -24,13 +24,18 @@ end
 
 local base_config = config_home .. sep .. "cdin"
 local base_data   = data_home .. sep .. "cdin"
+config.site_dir       = config.site_dir or (env("CDIN_SITE_DIR") or (base_data .. sep .. "site"))
 
 config.user_root      = config.user_root or base_config
 config.user_dir       = config.user_dir or (base_config .. sep .. "user")
 config.extension_dir  = config.extension_dir or (base_data .. sep .. "extensions")
-config.registry_dir   = config.registry_dir or (base_data .. sep .. "registry" .. sep .. "cdin-x")
+config.registry_dir   = config.registry_dir or (env("CDIN_X_REGISTRY")
+                                        or (base_data .. sep .. "registry" .. sep .. "cdin-x"))
 config.state_file     = config.state_file or (base_data .. sep .. "extensions.lua")
 config.registry_url   = config.registry_url or "https://github.com/m-mdy-m/cdin-x.git"
-config.fonts_dir = config.fonts_dir or (EXEDIR .. "/data/fonts")
+
+-- config.fonts_dir is deliberately NOT set here. The fonts are part of the
+-- mandatory bundle and the host already points at them; an extension that
+-- needed a different font would shadow the editor's own text rendering.
 
 return config

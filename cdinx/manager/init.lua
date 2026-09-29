@@ -1,14 +1,14 @@
 -- CDIN-X extension manager — public facade.
 local core     = require "core"
 local fs       = require "core.fs"
-local config   = require "core.x.config"
+local config   = require "cdinx.config"
 
-local Util      = require "core.x.manager.util"
-local GitSync   = require "core.x.manager.git"
-local State     = require "core.x.manager.state"
-local Catalog   = require "core.x.manager.catalog"
-local Runtime   = require "core.x.manager.runtime"
-local Lifecycle = require "core.x.manager.lifecycle"
+local Util      = require "cdinx.manager.util"
+local Registry  = require "cdinx.manager.registry"
+local State     = require "cdinx.manager.state"
+local Catalog   = require "cdinx.manager.catalog"
+local Runtime   = require "cdinx.manager.runtime"
+local Lifecycle = require "cdinx.manager.lifecycle"
 
 local Manager = {
   available = {},
@@ -20,6 +20,10 @@ local ctx = {
   available = Manager.available,
   sources = Manager.sources,
   installed = Manager.installed,
+  -- Plugins the host already loaded before cdin-x ran. The mandatory
+  -- bundle is the normal case: a cdin build ships vim, the host's loader
+  -- has already initialised it, and cdin-x must not initialise it again.
+  provided = {},
   state = { disabled = {}, lock = {} },
   registry_external = false,
 }
@@ -31,14 +35,13 @@ local bootstrapped = false
 local function user_extensions_root()
   return config.extension_dir
 end
-
 local function builtin_root()
-  return Util.join(EXEDIR, "data", "X")
+  return Util.join(config.site_dir, "X")
 end
 
 local function current_roots()
   return {
-    registry  = GitSync.registry_root(config),
+    registry  = Registry.registry_root(config),
     installed = user_extensions_root(),
     builtin   = builtin_root(),
   }
@@ -46,7 +49,16 @@ end
 
 local function merge_sources()
   local all = Catalog.merge_sources(ctx, current_roots())
-  Manager.available = ctx.available
+  -- A plugin the host already loaded is not a plugin the manager offers:
+  -- it is already running, so listing it as installable would invite the
+  -- user to "install" something that is present, and loading it would be
+  -- the double-init described on collect_provided. Deps still resolves it
+  -- as a satisfied dependency, so integrations that need vim keep working.
+  for name in pairs(ctx.provided or {}) do
+    all[name] = nil
+    ctx.sources[name] = "provided"
+  end
+  Manager.available = all
   Manager.sources = ctx.sources
   return all
 end
@@ -62,17 +74,44 @@ end
 -- ── registry ───────────────────────────────────────────────────────────
 
 function Manager.ensure_registry(force)
-  local ok, err = GitSync.ensure(config, ctx, force)
+  local ok, err = Registry.ensure(config, ctx)
   if not ok then return false, err end
+  if force then
+    local refreshed, refresh_err = Registry.refresh(config)
+    if not refreshed then return false, refresh_err end
+  end
   merge_sources()
   return true
 end
 
+-- Lets an extension that knows how to fetch the catalog (the git extension)
+-- supply the one operation core refuses to implement itself. With none
+-- registered, refresh_registry reports that it is unavailable.
+function Manager.set_registry_syncer(fn)
+  Registry.set_syncer(fn)
+end
+
 function Manager.refresh_registry()
-  local ok, err = GitSync.ensure(config, ctx, true)
+  local ok, err = Registry.ensure(config, ctx)
   if not ok then return false, err end
+  local refreshed, refresh_err = Registry.refresh(config)
+  if not refreshed then return false, refresh_err end
   merge_sources()
   return true
+end
+
+-- ── host-provided plugins ──────────────────────────────────────────────
+
+local function collect_provided()
+  local provided = {}
+  local ok, plugins = pcall(require, "core.plugins")
+  if ok and plugins and plugins.loaded then
+    for name in pairs(plugins.loaded) do
+      provided[name] = true
+    end
+  end
+  ctx.provided = provided
+  return provided
 end
 
 -- ── boot ───────────────────────────────────────────────────────────────
@@ -81,6 +120,7 @@ function Manager.bootstrap()
   if bootstrapped then return true end
 
   ctx.state = State.load(config)
+  collect_provided()
   merge_sources()
 
   local ok = Runtime.load_all(ctx, is_disabled)
@@ -224,7 +264,7 @@ function Manager.update(name)
   if not ok then return false, err end
   merge_sources()
 
-  local success, result = Lifecycle.update(ctx, config, name, GitSync.registry_root(config))
+  local success, result = Lifecycle.update(ctx, config, name, Registry.registry_root(config))
   save_state()
   merge_sources()
   return success, result
@@ -232,7 +272,7 @@ end
 
 function Manager.clean(dry_run)
   merge_sources()
-  local ok, result = Lifecycle.clean(ctx, user_extensions_root(), GitSync.registry_root(config), dry_run)
+  local ok, result = Lifecycle.clean(ctx, user_extensions_root(), Registry.registry_root(config), dry_run)
   if dry_run then return ok, result end
   save_state()
   merge_sources()

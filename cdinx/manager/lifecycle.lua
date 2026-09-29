@@ -1,8 +1,8 @@
 local fs       = require "core.fs"
-local Manifest = require "core.x.manifest"
-local Util     = require "core.x.manager.util"
-local Catalog  = require "core.x.manager.catalog"
-local Runtime  = require "core.x.manager.runtime"
+local Manifest = require "cdinx.manifest"
+local Util     = require "cdinx.manager.util"
+local Catalog  = require "cdinx.manager.catalog"
+local Runtime  = require "cdinx.manager.runtime"
 
 local Lifecycle = {}
 

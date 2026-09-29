@@ -1,6 +1,6 @@
 local fs       = require "core.fs"
-local Manifest = require "core.x.manifest"
-local Util     = require "core.x.manager.util"
+local Manifest = require "cdinx.manifest"
+local Util     = require "cdinx.manager.util"
 
 local Catalog = {}
 
@@ -21,12 +21,31 @@ local function record(meta, name, path, relpath, category, single_file, source, 
   found[meta.name] = meta
 end
 
+local function is_theme_dir(category, dir)
+  if category ~= "themes" then return false end
+  if is_plugin_dir(dir) then return false end
+  return fs.is_file(Util.join(dir, "theme.lua"))
+end
+
+local function record_theme(dir, name, relpath, source, found)
+  local file = Util.join(dir, "theme.lua")
+  local ok, data = pcall(dofile, file)
+  if not ok or type(data) ~= "table" then
+    core.log("cdin-x: skip %s: %s", relpath .. "/theme.lua", tostring(data))
+    return
+  end
+  record(data, data.name or name, dir, relpath, "themes", false, source, found)
+  found[data.name or name].type = "theme"
+end
+
 local function scan_dir(dir, relpath, category, source, found)
   for _, entry in ipairs(fs.list(dir) or {}) do
     if entry.type == "dir" and entry.name ~= ".git" then
       local sub_dir = Util.join(dir, entry.name)
       local sub_rel = relpath == "" and entry.name or (relpath .. "/" .. entry.name)
-      if is_plugin_dir(sub_dir) then
+      if is_theme_dir(category, sub_dir) then
+        record_theme(sub_dir, entry.name, sub_rel, source, found)
+      elseif is_plugin_dir(sub_dir) then
         local meta, err = Manifest.load(sub_dir)
         if meta then
           record(meta, entry.name, sub_dir, sub_rel, category, false, source, found)

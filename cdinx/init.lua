@@ -1,5 +1,9 @@
 -- CDIN-X runtime bootstrap.
-
+--
+-- Required as `require "cdinx"`, from the entry plugin at
+-- plugins/cdin-x/init.lua. The host never names this module: cdin only
+-- knows that it loads a bundled plugin, a site plugin, and whatever a
+-- plugin's init() does. Everything below is reached from that one call.
 local core   = require "core"
 local cdin_x = {}
 local booted = false
@@ -14,19 +18,19 @@ function cdin_x.bootstrap()
   if booted then return true end
   booted = true
 
-  local Manager = require "core.x.manager"
+  local Manager = require "cdinx.manager"
   local ok, err = Manager.bootstrap()
   if not ok then
     booted = false
     return false, err
   end
 
-  local Command = require "core.x.command"
+  local Command = require "cdinx.command"
   Command.register()
 
-  require "core.x.panel"
+  require "cdinx.panel"
 
-  core.x = cdin_x
+  core.cdinx = cdin_x
   core.log("cdin-x bootstrapped")
   core.log("  built-in: %d", count(Manager.list_builtin()))
   core.log("  installed: %d", count(Manager.list_local()))
@@ -34,51 +38,51 @@ function cdin_x.bootstrap()
 end
 
 function cdin_x.install(name)
-  return require("core.x.manager").install(name)
+  return require("cdinx.manager").install(name)
 end
 
 function cdin_x.install_local(path)
-  return require("core.x.manager").install_local(path)
+  return require("cdinx.manager").install_local(path)
 end
 
 function cdin_x.uninstall(name)
-  return require("core.x.manager").uninstall(name)
+  return require("cdinx.manager").uninstall(name)
 end
 
 function cdin_x.enable(name)
-  return require("core.x.manager").enable(name)
+  return require("cdinx.manager").enable(name)
 end
 
 function cdin_x.disable(name)
-  return require("core.x.manager").disable(name)
+  return require("cdinx.manager").disable(name)
 end
 
 function cdin_x.refresh()
-  return require("core.x.manager").refresh_registry()
+  return require("cdinx.manager").refresh_registry()
 end
 
 function cdin_x.update(name)
-  return require("core.x.manager").update(name)
+  return require("cdinx.manager").update(name)
 end
 
 function cdin_x.clean(dry_run)
-  return require("core.x.manager").clean(dry_run)
+  return require("cdinx.manager").clean(dry_run)
 end
 
 function cdin_x.list()
-  return require("core.x.manager").list()
+  return require("cdinx.manager").list()
 end
 
 function cdin_x.search(query)
-  return require("core.x.manager").search(query)
+  return require("cdinx.manager").search(query)
 end
 
 function cdin_x.get(name)
-  return require("core.x.manager").get(name)
+  return require("cdinx.manager").get(name)
 end
 
 function cdin_x.open_readme(name)
-  return require("core.x.manager").open_readme(name)
+  return require("cdinx.manager").open_readme(name)
 end
 
 return cdin_x
