@@ -35,7 +35,13 @@ end
 -- rescan.
 local providers = {}
 
-local mt = { __tostring = function(t) return t.text end }
+-- Every item carries this so common.fuzzy_match, which scores
+-- tostring(item), sees the text rather than the table's address. Exported
+-- because suggest.lua folds a run of equal items into one merged entry and
+-- the merged entry has to be the same shape as the ones it replaces — a
+-- second metatable here would be a second thing to keep in step.
+M.ITEM_MT = { __tostring = function(t) return t.text end }
+local mt = M.ITEM_MT
 
 -- spec = {
 --   name  = "open-docs",
