@@ -16,10 +16,17 @@
 # LUA    overrides the interpreter (default: lua).
 
 SITE ?=
+# Mirrors cdin's config.site_dirname — the site directory's name, the one
+# knob that decides what <data_home>/cdin/<name> is called. Set it here as
+# well as in your cdin user init.lua if you rename the directory; cdin's
+# `make test-site-dir` compares the two so they cannot drift apart silently.
+SITE_NAME ?=
 LUA  ?= $(shell command -v lua 2>/dev/null || echo lua)
 PYTHON ?= python3
 
-SITE_ARG = $(if $(SITE),--site "$(SITE)",)
+# --site is a full path and wins; --site-name is only passed when no full
+# path was given, so the two can never disagree.
+SITE_ARG = $(if $(SITE),--site "$(SITE)",$(if $(SITE_NAME),--site-name "$(SITE_NAME)",))
 
 .PHONY: install link uninstall bundle validate manifest list help
 
