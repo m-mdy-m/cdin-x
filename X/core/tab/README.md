@@ -1,13 +1,13 @@
 # tab
 
-Essential tab UI and tab-session support.
+Tabs: creating them, switching between them, moving and closing them.
 
-This extension is part of CDIN's built-in extension set and cannot be uninstalled.
+`gt` / `gT` and `:tabnew` and friends live in
+[`vim-tab`](../../integration/vim/vim-tab), and session persistence across
+restarts lives in [`tab-session`](../../integration/tab-session). This plugin is
+the capability; both of those are the wiring.
 
-## Implementation
+Optional — install it from the manager. Only `vim` and the `default` theme are
+part of a cdin build.
 
-The plugin keeps its public entry point in `init.lua` and isolates implementation modules beside it.
-
-## License
-
-MIT
+**Full page:** [tab — what it does, what you press, and how it works](../../../docs/plugins/tab.md)

@@ -1,13 +1,12 @@
 # window
 
-Essential window split/focus/layout management.
+Splits, focus movement, and layout.
 
-This extension is part of CDIN's built-in extension set and cannot be uninstalled.
+<kbd>Ctrl</kbd>+<kbd>W</kbd>, <kbd>Tab</kbd> and `:split` and friends live in
+[`vim-window`](../../integration/vim/vim-window). This plugin is the capability;
+that is the wiring.
 
-## Implementation
+Optional — install it from the manager. Only `vim` and the `default` theme are
+part of a cdin build.
 
-The plugin keeps its public entry point in `init.lua` and isolates implementation modules beside it.
-
-## License
-
-MIT
+**Full page:** [window — what it does, what you press, and how it works](../../../docs/plugins/window.md)

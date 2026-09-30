@@ -1,28 +1,38 @@
 # cdin-x
 
-**cdin-x** is the extension ecosystem for [cdin](https://github.com/m-mdy-m/cdin).
-It is deliberately separate from the editor runtime: cdin is a runtime that
-knows nothing about extensions, and everything an extension can be — the
-mandatory set a build bundles, and the optional workflows and plugins a user
-installs — lives here.
+The extension ecosystem for [cdin](https://github.com/m-mdy-m/cdin).
+
+cdin is the editor — window, renderer, text pipeline, document, command and
+key registries — and it knows nothing about plugins. This repository is
+everything the editor isn't.
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
----
+## Why it's a separate repository
 
-## What it is
+So that both halves can be wrong independently.
 
-Two kinds of thing live here, and the difference matters.
+A cdin checkout builds and runs with nothing from here present: `make bin`
+needs no cdin-x, and the editor starts, renders, edits, and answers
+<kbd>Ctrl</kbd>+<kbd>N</kbd> with an empty site directory. Conversely, this
+repository installs, updates and removes itself without going near an editor
+installation. Neither one reads a path into the other except at build time, and
+there that path is one variable, `CDINX_DIR`.
+
+The cost is a line in a build script. What it buys is that "the editor is
+broken" and "an extension misbehaves" stop being the same investigation.
+
+## Two kinds of thing live here
 
 **The mandatory set**: the `vim` plugin, the `default` theme, and the fonts.
 A cdin build without these is not a working editor, so a build copies them in
-with [`scripts/bundle.py`](scripts/bundle.py). They are selected by a marker
-— `essential = true` in a plugin's manifest — and nothing else is.
+from this repository. They are selected by a marker — `essential = true` in a
+plugin's manifest — and exactly two things carry it: `vim` and the `default`
+theme. Nothing else does, and `make validate` fails if the count is wrong.
 
-**The optional set**: everything else. The command palette, the file finders,
-the project tree, tabs, search, git, and the themes beyond the default. A user
-installs these into their own site directory, and the editor's in-app manager
-handles them from there.
+**Everything else**: the command palette, the file finders, the project tree,
+tabs, search, git, the themes beyond the default. A user installs these from
+inside the editor, and the in-app manager handles them from there.
 
 ## Install
 
@@ -30,72 +40,131 @@ handles them from there.
 git clone https://github.com/m-mdy-m/cdin-x.git
 cd cdin-x
 
-make link     # symlink into the site directory (development)
-make install  # copy into the site directory
+make link      # symlink into the site directory — for development
+make install   # copy into the site directory
 make uninstall
 ```
 
-## Bundling for a cdin build
+That writes three directories into cdin's **site directory** and nothing else:
 
-This is what a cdin build runs, at build time, from a checkout of this
-repository:
+```text
+<site>/cdinx/            the manager
+<site>/X/                the plugins
+<site>/plugins/cdin-x/   the entry point cdin's loader finds
+```
+
+The site directory is `<data_home>/cdin/site` — `data_home` being
+`$XDG_DATA_HOME` or `~/.local/share` on POSIX, and `%LOCALAPPDATA%`, then
+`%APPDATA%`, then `%USERPROFILE%\AppData\Local` on Windows. It is the editor's
+to name, so if you renamed it:
+
+```sh
+make link SITE_NAME=extensions        # just the name
+make link SITE=/somewhere/else         # or a full path, which wins
+```
+
+`site` is the word vim and neovim use for exactly this directory
+(`:h site-dir`) — third-party content, as opposed to the editor's own.
+
+## Then, from inside cdin
+
+<kbd>Shift</kbd>+<kbd>M</kbd> opens the manager. Pick something, press
+<kbd>Space</kbd>, and it's installed and loaded. No restart, and after this
+one-time install you don't come back to a terminal for it.
+
+**[Start here](docs/getting-started.md)** if you just want to use it.
+
+## For a cdin build
+
+A cdin build consumes this repository through one variable:
+
+```sh
+make CDINX_DIR=/path/to/cdin-x      # in the cdin checkout
+```
+
+which runs `scripts/bundle.py`, writing exactly five things into the build's
+`data/` directory: each essential plugin, the essential theme, the fonts, a
+one-line shim per plugin, and a `BUNDLE.lua` index. Real copies, no network.
+
+It fails rather than working around a problem — no essential plugin, not
+exactly one essential theme, a missing or empty `fonts/`, or an output
+directory that is a symlink or junction, which it will not write through.
+
+It is also idempotent: a second run over the first run's output is
+byte-identical, and no timestamps are preserved. A bundle that differs between
+builds of the same commit is a bug, and this is what makes that checkable
+rather than a matter of trust.
+
+Run it by hand with:
 
 ```sh
 make bundle DEST=/path/to/cdin/build/<platform>/data
 ```
 
-which is `scripts/bundle.py --out <DEST>`. It writes the essential plugins,
-the essential theme, the fonts, a one-line shim per plugin, and a `BUNDLE.lua`
-index. Real copies, no network, idempotent — a second run over the first
-run's output is byte-identical.
-
-It fails, loudly, rather than working around a problem: no essential plugin,
-not exactly one essential theme, a missing or empty `fonts/`, or a `--out` that
-is a symlink or junction.
-
-## For cdin builds
+## Developing
 
 ```sh
-make CDINX_DIR=/path/to/cdin-x   # from the cdin checkout
-```
-
-`CDINX_DIR` is the only thing cdin knows about this repository, and it is a
-path. `make bin` in cdin compiles the binary and needs nothing from here.
-
-## Developing an extension
-
-```sh
-make validate    # structural checks over the whole catalog
+make validate    # the gate
 make manifest    # regenerate X/manifest.lua
 make list        # print the catalog
-lua scripts/new-plugin.lua <name> [core|integration|optional|syntax]
 ```
 
-`make validate` is the gate. It checks the required files, the essential set,
-the theme layout, the dependency rules, the `register`/`unregister` seam every
-plugin is expected to expose, self-containment of every essential plugin, and
-that no file under `cdinx/` or `X/` refers to a cdin install layout or to the
-old `core.x` module namespace.
+`make validate` is the one that matters. It checks the required files, the
+essential set, the theme layout, declared dependencies, the
+`register`/`unregister` symmetry, that nothing under `cdinx/` or `X/` refers
+to a cdin install layout or to the old `core.x` namespace, and that every
+essential plugin is self-contained. Then it **runs the real bundler twice and
+compares**, so the thing a cdin build actually consumes gets checked instead
+of assumed.
 
-An **essential** plugin — one a cdin build bundles — must be self-contained:
-every `require "X.…"` inside it has to resolve within its own subtree, because
-the bundle contains that plugin and nothing else. `make validate` enforces it.
+Every rule it enforces is a failure that is invisible until much later — a
+`module not found` at startup in a built editor, or a plugin that works until
+somebody uninstalls the other one. The reasons are in
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
+## The layout
+
+Every one of these has a README that says what the directory is and stops
+there.
+
+| directory | holds | the rule that shapes it |
+| --- | --- | --- |
+| [`X/core/`](X/core) | one capability each | may not depend on another X plugin |
+| [`X/integration/`](X/integration) | the wiring between capabilities | declares what it needs; may depend on two or more |
+| [`X/optional/`](X/optional) | plugins nobody is waiting for | may not depend on another X plugin |
+| [`X/syntax/`](X/syntax) | language definitions, one file each | the host only |
+| [`X/themes/`](X/themes) | themes, as `<name>/theme.lua` | the host only |
+| [`cdinx/`](cdinx) | the manager | reads `config.site_path()` and nothing else about paths |
+| [`plugins/`](plugins) | the entry point cdin's loader finds | one file |
+| [`scripts/`](scripts) | bundler, installer, and the tools validate runs | stdlib and plain `lua`, no dependencies |
+| [`examples/`](examples) | three complete plugins to copy | not part of the catalog |
 
 ## Documentation
 
-- [X/README.md](X/README.md) — the extension layout and conventions
-- [X/integration/README.md](X/integration/README.md) — how plugins are wired
-- [X/core/vim/README.md](X/core/vim/README.md) — vim's extension points
-- cdin's [extension contract](https://github.com/m-mdy-m/cdin/blob/main/docs/architecture/extension-contract.md)
-  — what cdin guarantees, and what may be relied on
+| you want | read |
+| --- | --- |
+| to use it | [docs/getting-started.md](docs/getting-started.md) |
+| to install plugins | [docs/installing-plugins.md](docs/installing-plugins.md) |
+| to use one plugin | [docs/plugins/](docs/plugins/) — one page each, with what you press and how it works |
+| to write a plugin | [docs/writing-a-plugin.md](docs/writing-a-plugin.md) — and [examples/](examples/) |
+| to make an integration | [docs/building/an-integration.md](docs/building/an-integration.md) |
+| to make a theme | [docs/building/a-theme.md](docs/building/a-theme.md) |
+| to highlight a language | [docs/building/a-syntax-definition.md](docs/building/a-syntax-definition.md) |
+| to extend vim mode | [docs/extending-vim.md](docs/extending-vim.md) |
+| to work on this repo | [CONTRIBUTING.md](CONTRIBUTING.md), [scripts/README.md](scripts/README.md) |
+| to know what cdin guarantees | [the extension contract](https://github.com/m-mdy-m/cdin/blob/main/docs/architecture/extension-contract.md) |
+
+Start at [docs/README.md](docs/README.md) if you would rather pick one.
 
 ## Requirements
 
 A cdin that implements the extension contract: a site directory, a plugin
-loader, `core.command_view`, and the command and keymap registries. cdin-x
-assumes nothing about where that cdin is installed, and fetches nothing at
-runtime.
+loader, `core.command_view`, and the command and key registries. Nothing here
+assumes where that cdin is installed, and nothing is fetched at runtime except
+the plugin catalog.
+
+Python 3.8+ standard library for the two scripts, and `lua` for the four tools.
+No dependencies beyond that.
 
 ## License
 
