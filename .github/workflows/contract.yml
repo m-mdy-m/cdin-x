@@ -1,0 +1,138 @@
+# Does the host still accept us?
+#
+# cdin-x has no build, so nothing here compiles anything. What it does have is
+# a contract with a repository it cannot see: cdin's
+# docs/architecture/extension-contract.md. That contract is only enforced if
+# somebody checks it from both ends, and this is the cdin-x end.
+#
+# cdin's own suite is the instrument — `make test-workflows` boots the real
+# loader with this checkout as the site directory and asserts that palette,
+# finder and modules register their commands, that ctrl+p / ctrl+shift+p /
+# ctrl+o / ctrl+shift+o each have exactly one command bound, that the runtime
+# keymap names none of them, and that unloading detaches both. `make
+# test-site-dir` asserts the two repositories cannot disagree about the name of
+# the site directory. Neither can be checked from here alone: both need cdin.
+#
+# This is why a plugin repository needs CI at all. A plugin repo that only
+# lints itself can be perfectly valid and perfectly incompatible.
+
+name: Contract
+
+on:
+  workflow_call:
+    inputs:
+      cdin-repo:
+        description: 'The host repository.'
+        type: string
+        default: 'm-mdy-m/cdin'
+      cdin-ref:
+        # Must be the branch that carries docs/architecture/extension-contract.md
+        # AND the two test scripts. On cdin those are the same branch today, and
+        # that branch is not cdin's `main` — a tag workflow that quietly tested
+        # `main` would report success by not running at all.
+        description: 'Branch of the host to test against.'
+        type: string
+        default: 'resplit'
+    outputs:
+      ran:
+        description: 'true when the host suite actually executed.'
+        value: ${{ steps.probe.outputs.ran }}
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    name: Against ${{ inputs.cdin-repo }}@${{ inputs.cdin-ref }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout cdin-x
+        uses: actions/checkout@v7
+
+      # A sibling *inside* the workspace rather than ../cdin, and CDINX_DIR is
+      # passed explicitly below instead of leaning on cdin's ../cdin-x default.
+      # Two reasons: checkout into a path above the workspace is a shape that
+      # has bitten people, and being explicit about the one path both
+      # repositories have to agree on is the point of the test.
+      - name: Checkout cdin
+        uses: actions/checkout@v7
+        with:
+          repository: ${{ inputs.cdin-repo }}
+          ref: ${{ inputs.cdin-ref }}
+          path: cdin-host
+          persist-credentials: false
+
+      - name: Install Lua 5.4
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends lua5.4
+          command -v lua >/dev/null 2>&1 || \
+            sudo ln -sf "$(command -v lua5.4)" /usr/local/bin/lua
+          lua -v
+
+      # Loud skip, not a silent one. A green job that tested nothing is worse
+      # than a red one, so this says so in the summary — and `ran` is reported
+      # as an output so a release workflow can decide for itself whether an
+      # unrun contract should block a tag.
+      - name: Does this ref of cdin carry the contract tests?
+        id: probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd cdin-host
+          if [ -f scripts/test_workflows.lua ] && [ -f scripts/test_site_dir.lua ]; then
+            echo "ran=true" >> "$GITHUB_OUTPUT"
+            echo "✓ ${{ inputs.cdin-ref }} carries the contract tests"
+          else
+            echo "ran=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "::warning title=contract tests not run::cdin@${{ inputs.cdin-ref }} has no scripts/test_workflows.lua / test_site_dir.lua."
+              echo "The half of the contract that lives in cdin-x was checked; the half that lives in cdin was NOT."
+              echo "Point cdin-ref at the branch that carries docs/architecture/extension-contract.md."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::warning::skipping — cdin@${{ inputs.cdin-ref }} does not carry the contract tests"
+          fi
+
+      - name: cdin's half — workflow commands and keystrokes
+        if: steps.probe.outputs.ran == 'true'
+        shell: bash
+        env:
+          CDINX_DIR: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          cd cdin-host
+          # Two legs: cdin-x installed, and nothing installed. The second is
+          # the state a user is in before they install anything, and it is not
+          # redundant — it is the same assertion made through the real loader
+          # against a real absent site.
+          make test-workflows CDINX_DIR="$CDINX_DIR"
+
+      - name: cdin's half — the site directory name
+        if: steps.probe.outputs.ran == 'true'
+        shell: bash
+        env:
+          CDINX_DIR: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          cd cdin-host
+          make test-site-dir CDINX_DIR="$CDINX_DIR"
+
+      - name: Summary
+        shell: bash
+        run: |
+          {
+            echo "### Contract with ${{ inputs.cdin-repo }}@${{ inputs.cdin-ref }}"
+            echo ""
+            if [ "${{ steps.probe.outputs.ran }}" = "true" ]; then
+              echo "- \`make test-workflows\` — passed (site full and site empty)"
+              echo "- \`make test-site-dir\` — passed"
+              echo ""
+              echo "The keystroke contract in cdin's keymap file still matches what this checkout registers."
+            else
+              echo "- \`make test-workflows\` — **not run** (absent on that ref)"
+              echo "- \`make test-site-dir\` — **not run** (absent on that ref)"
+              echo ""
+              echo "Everything checkable from cdin-x alone passed. Nothing here can prove cdin will load it."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

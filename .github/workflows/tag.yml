@@ -1,0 +1,214 @@
+# Create a release tag.
+#
+# Tagging is the one write a plugin repository performs on itself, and the two
+# ways to do it by hand are both easy to get subtly wrong: tag the wrong
+# commit, or tag a version nobody wrote down. So this does the gates first and
+# the push second, and `dry_run` defaults to true so a stray click is a report
+# rather than a release.
+#
+# If you use gix — and .gix/config puts `tag: true` on `release/*` and
+# `hotfix/*` — you do not need this. gix tags the merge commit, release.yml
+# fires on the tag, and the gates in release.yml's `guard` still apply. This is
+# the path for tagging without gix, and for re-cutting a release that was
+# tagged from the wrong place.
+#
+# Everything here is a *pre*-check. release.yml re-checks all of it, because a
+# tag can also arrive by being pushed by hand, and the release must not depend
+# on which workflow created the tag.
+
+name: Tag
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version without the v, e.g. 0.1.0 or 0.2.0-alpha.2'
+        type: string
+        required: true
+      target:
+        description: 'Branch to tag. Must be merged into main.'
+        type: string
+        default: 'main'
+      dry_run:
+        description: 'Check everything and stop. Uncheck to push the tag.'
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+# No concurrency group on purpose: two tags are two releases, and cancelling
+# one because another was dispatched would leave a half-published state with
+# no way to tell which.
+
+jobs:
+  tag:
+    name: Tag
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          # Full history: the ancestry checks and the "previous tag" comparison
+          # both need it, and a shallow clone would make them pass vacuously.
+          fetch-depth: 0
+
+      - name: Gate
+        id: gate
+        shell: bash
+        env:
+          RAW_VERSION: ${{ inputs.version }}
+          TARGET: ${{ inputs.target }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          version="${RAW_VERSION#v}"
+          tag="v${version}"
+
+          if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+            echo "::error::'$RAW_VERSION' is not MAJOR.MINOR.PATCH[-PRERELEASE]"
+            exit 1
+          fi
+
+          git fetch --quiet --tags origin
+
+          # ── 1. the tag is free ────────────────────────────────────────────
+          if git rev-parse -q --verify "refs/tags/$tag" > /dev/null; then
+            echo "::error::$tag already exists"
+            exit 1
+          fi
+
+          # ── 2. it goes forwards ───────────────────────────────────────────
+          # Versions are compared field by field, not with sort -V on the whole
+          # string, because `sort -V` orders 0.2.0-alpha.2 before
+          # 0.2.0-alpha.10 and treats the absence of a suffix as equal to it.
+          # Two versions with the same core and different pre-release suffixes
+          # are compared approximately and say so.
+          latest=$(git tag --sort=v:refname | grep -E '^v?[0-9]+\.[0-9]+\.[0-9]+' | tail -1 || true)
+          latest="${latest#v}"
+
+          greater() {
+            # 0 if $1 < $2, 1 if equal, 2 if greater
+            local a="$1" b="$2"
+            local ac="${a%%-*}" bc="${b%%-*}"
+            local apre="" bpre=""
+            case "$a" in *-*) apre="${a#*-}" ;; esac
+            case "$b" in *-*) bpre="${b#*-}" ;; esac
+
+            local amajor="${ac%%.*}" aminor
+            aminor="${ac#*.}"; aminor="${aminor%%.*}"
+            local apatch="${ac#*.}"; apatch="${apatch%%.*}"
+            local bmajor="${bc%%.*}" bminor
+            bminor="${bc#*.}"; bminor="${bminor%%.*}"
+            local bpatch="${bc#*.}"; bpatch="${bpatch%%.*}"
+
+            for pair in "$amajor:$bmajor" "$aminor:$bminor" "$apatch:$bpatch"; do
+              local l="${pair%%:*}" r="${pair##*:}"
+              if [ "$l" -lt "$r" ]; then echo 0; return; fi
+              if [ "$l" -gt "$r" ]; then echo 2; return; fi
+            done
+
+            # Same core: a release outranks its own pre-releases.
+            if [ -z "$apre" ] && [ -z "$bpre" ]; then echo 1; return; fi
+            if [ -z "$apre" ]; then echo 2; return; fi
+            if [ -z "$bpre" ]; then echo 0; return; fi
+
+            if [ "$(printf '%s\n%s\n' "$apre" "$bpre" | sort -V | head -1)" = "$bpre" ]; then
+              echo 2
+            else
+              echo 0
+            fi
+          }
+
+          if [ -n "$latest" ]; then
+            cmp=$(greater "$version" "$latest")
+            if [ "$cmp" -ne 2 ]; then
+              echo "::error::$version does not come after the latest tag v$latest"
+              exit 1
+            fi
+            echo "✓ $version > $latest"
+          else
+            echo "✓ no previous tag — this is the first release"
+          fi
+
+          # ── 3. the version is written down ────────────────────────────────
+          if ! grep -q "^## \[${version}\]" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no '## [${version}]' section."
+            echo "Write the release notes first; a tag is a promise about what shipped."
+            exit 1
+          fi
+          # index(...) == 1, not an equality test: the headings in this file
+          # carry a date, so `## [0.1.0]` never matches `## [0.1.0] - 2026-09-30`
+          # and the count below would be 0 for a version that is fully written.
+          body=$(awk -v v="$version" '
+            index($0, "## [" v "]") == 1 { inside = 1; next }
+            inside && /^## \[/ { exit }
+            inside { print }
+          ' CHANGELOG.md | sed -e 's/[[:space:]]*$//' | grep -c . || true)
+          if [ "$body" -lt 1 ]; then
+            echo "::error::the '${version}' section of CHANGELOG.md is empty"
+            exit 1
+          fi
+          echo "✓ CHANGELOG.md documents ${version} ($body non-empty lines)"
+
+          # ── 4. the commit is on main ──────────────────────────────────────
+          sha=$(git rev-parse "origin/$TARGET")
+          if ! git merge-base --is-ancestor "$sha" origin/main; then
+            echo "::error::origin/$TARGET ($sha) is not merged into origin/main"
+            echo "Release from a merge, not from a branch."
+            exit 1
+          fi
+          subject=$(git log -1 --format='%s' "$sha")
+          echo "✓ origin/$TARGET → $sha is on main — $subject"
+
+          echo "tag=$tag"       >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "sha=$sha"       >> "$GITHUB_OUTPUT"
+          echo "prerelease=$(case "$version" in *-*) echo true ;; *) echo false ;; esac)" \
+            >> "$GITHUB_OUTPUT"
+
+          {
+            echo "### Tagging $tag"
+            echo ""
+            echo "- commit: \`$sha\` ($(git log -1 --format='%h %s' "$sha"))"
+            echo "- previous tag: ${latest:-none}"
+            echo "- prerelease: $(case "$version" in *-*) echo yes ;; *) echo no ;; esac)"
+            echo "- changelog: \`## [$version]\`, $body lines"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Report
+        if: inputs.dry_run
+        shell: bash
+        env:
+          TAG: ${{ steps.gate.outputs.tag }}
+          SHA: ${{ steps.gate.outputs.sha }}
+        run: |
+          {
+            echo ""
+            echo "> **dry run** — nothing was pushed. Re-run with \`dry_run\` unchecked to create \`$TAG\`."
+            echo ">"
+            echo "> \`$TAG\` → \`$SHA\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "::notice::dry run — $TAG would be created at $SHA. Re-run with dry_run=false to push it."
+
+      - name: Create and push the tag
+        if: ${{ !inputs.dry_run }}
+        shell: bash
+        env:
+          TAG: ${{ steps.gate.outputs.tag }}
+          SHA: ${{ steps.gate.outputs.sha }}
+          VERSION: ${{ steps.gate.outputs.version }}
+        run: |
+          set -euo pipefail
+          # Annotated, not lightweight: `git describe` in a consumer's checkout
+          # has to be able to tell a release from the commit it points at, and
+          # a lightweight tag carries no message and no tagger.
+          git tag -a "$TAG" -m "cdin-x $VERSION" "$SHA"
+          git push origin "refs/tags/$TAG"
+
+          {
+            echo ""
+            echo "> Pushed \`$TAG\` → \`$SHA\`. The **Release** workflow is now running."
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "✓ pushed $TAG — the Release workflow will publish it"

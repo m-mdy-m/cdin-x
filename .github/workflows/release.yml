@@ -1,0 +1,342 @@
+# Publish a cdin-x release.
+#
+# Same shape as cdin's release.yml: guard, build, publish. Different content,
+# because there is no binary. The "build" is bundle.yml — the artifact a cdin
+# build reads — and the guard is stricter than a version check, because the
+# three ways this release can go wrong are all cheap to prevent:
+#
+#   1. a tag with no changelog section   — the release notes would be a
+#      sentence pointing at a changelog that does not contain the release
+#   2. a tag off a commit that is not on main — an alpha nobody can install,
+#      and one whose content nothing else has tested
+#   3. a prerelease published as a full release — 0.2.0-alpha.1 showing up in
+#      someone's dependency list as 0.2.0
+#
+# There is a second way to get a tag here, and it is deliberate: tag.yml
+# creates one after running the same gates, for when you do not use gix's
+# release/* flow. Both paths end at this file, so neither can skip it.
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to (re)publish, e.g. v0.1.0'
+        type: string
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  guard:
+    name: Guard
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.resolve.outputs.tag }}
+      version: ${{ steps.resolve.outputs.version }}
+      prerelease: ${{ steps.resolve.outputs.prerelease }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Resolve and check the tag
+        id: resolve
+        shell: bash
+        env:
+          RAW: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          tag="$RAW"
+          if [ -z "$tag" ]; then
+            echo "::error::no tag given — dispatch this workflow with a tag, or push a v*.*.* tag"
+            exit 1
+          fi
+
+          # Anchored, so nothing that merely contains a version slips through.
+          if ! printf '%s' "$tag" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+            echo "::error::'$tag' is not a vMAJOR.MINOR.PATCH[-PRERELEASE] tag"
+            exit 1
+          fi
+          version="${tag#v}"
+          echo "tag=$tag"       >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+          # A pre-release is anything with a suffix. Decided from the tag, not
+          # from a flag someone can forget to pass: the tag is the artifact
+          # people depend on, and its shape is the only thing guaranteed to
+          # agree with what it says.
+          case "$version" in
+            *-*) echo "prerelease=true" >> "$GITHUB_OUTPUT" ;;
+            *)    echo "prerelease=false" >> "$GITHUB_OUTPUT" ;;
+          esac
+
+          # The tag has to exist. On a tag push it does; on a dispatch it may
+          # not, and publishing a release for a tag that is not there produces
+          # a release that cannot be checked out.
+          if ! git rev-parse -q --verify "refs/tags/$tag" > /dev/null; then
+            echo "::error::tag $tag does not exist in this repository."
+            echo "If you meant to create it, use the Tag workflow — it runs these same gates first."
+            exit 1
+          fi
+
+      - name: The version must be in the changelog
+        shell: bash
+        env:
+          VERSION: ${{ steps.resolve.outputs.version }}
+        run: |
+          set -euo pipefail
+          if ! grep -q "^## \[${VERSION}\]" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no '## [${VERSION}]' section."
+            echo "An unreleased version is a version somebody has not finished describing."
+            exit 1
+          fi
+          # A heading with nothing under it is the same failure wearing a
+          # disguise: the grep above would pass and the notes would be empty.
+          #
+          # index(...) == 1, not `== "## [0.1.0]"`. These headings carry a date
+          # (`## [0.1.0] - 2026-09-30`), so an equality test never matches and
+          # every extraction silently yields nothing. The closing bracket is
+          # what stops 0.1.0 from matching a 0.1.0-beta.1 section.
+          body=$(awk -v v="$VERSION" '
+            index($0, "## [" v "]") == 1 { inside = 1; next }
+            inside && /^## \[/ { exit }
+            inside { print }
+          ' CHANGELOG.md | sed -e 's/[[:space:]]*$//' | grep -c . || true)
+          if [ "$body" -lt 1 ]; then
+            echo "::error::the '${VERSION}' section of CHANGELOG.md is empty"
+            exit 1
+          fi
+          echo "✓ CHANGELOG.md documents ${VERSION} ($body non-empty lines)"
+
+      - name: The tag must be reachable from main
+        shell: bash
+        env:
+          TAG: ${{ steps.resolve.outputs.tag }}
+        run: |
+          set -euo pipefail
+          git fetch --quiet origin main
+          if ! git merge-base --is-ancestor "refs/tags/$TAG" origin/main; then
+            echo "::error::$TAG is not on origin/main."
+            echo "Releasing a commit nothing has tested is how an alpha becomes permanent."
+            exit 1
+          fi
+          echo "✓ $TAG is reachable from origin/main"
+
+  build:
+    name: Validate + bundle
+    needs: guard
+    uses: ./.github/workflows/bundle.yml
+    with:
+      tag: ${{ needs.guard.outputs.tag }}
+    permissions:
+      contents: read
+
+  publish:
+    name: Publish
+    needs: [guard, build]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Download the bundle
+        uses: actions/download-artifact@v8
+        with:
+          name: cdin-x-bundle
+          path: release
+
+      - name: Collect assets
+        shell: bash
+        env:
+          TAG: ${{ needs.guard.outputs.tag }}
+        run: |
+          set -euo pipefail
+          ls -lh release/
+          if [ ! -f "release/cdin-x-bundle-${TAG}.tar.gz" ]; then
+            echo "::error::expected release/cdin-x-bundle-${TAG}.tar.gz"
+            exit 1
+          fi
+
+      # The changelog section for this version, verbatim, so the release page and
+      # the file cannot disagree.
+      #
+      # awk rather than the `sed -n '/…/,/…/p' | sed '$d'` that cdin's
+      # release.yml uses, for one reason: sed needs a *terminating* line to stop
+      # on, and this is currently the last section in the file, so `sed '$d'`
+      # would delete the final line of the release notes. awk stops at the next
+      # `## [` if there is one and simply runs to the end if there is not.
+      - name: Release notes from the changelog
+        shell: bash
+        env:
+          VERSION: ${{ needs.guard.outputs.version }}
+          TAG: ${{ needs.guard.outputs.tag }}
+        run: |
+          set -euo pipefail
+          {
+            echo "# cdin-x ${TAG}"
+            echo ""
+            awk -v v="$VERSION" '
+              index($0, "## [" v "]") == 1 { inside = 1; next }
+              inside && /^## \[/ { exit }
+              inside { print }
+            ' CHANGELOG.md
+          } > release_body.md
+
+          if [ "$(grep -c . release_body.md || true)" -lt 3 ]; then
+            echo "::error::extracted release notes are empty — guard should have caught this"
+            exit 1
+          fi
+          head -20 release_body.md
+
+      # cdin-x's "installation" is not cdin's, and writing cdin's here would be
+      # actively wrong. Two distinct things ship a cdin-x, and conflating them
+      # is the misunderstanding this section exists to prevent:
+      #
+      #   * a cdin BUILD bundles the mandatory set from a cdin-x checkout, via
+      #     CDINX_DIR. You do not install anything for it.
+      #   * a USER installs the whole catalog into the editor's site directory.
+      - name: How to get this
+        shell: bash
+        env:
+          TAG: ${{ needs.guard.outputs.tag }}
+        run: |
+          cat >> release_body.md <<'NOTES'
+
+          ---
+
+          ## What this release is
+
+          This repository is not an application. It is the **extension catalog**
+          for [cdin](https://github.com/m-mdy-m/cdin), and it is installed or
+          bundled in one of two ways that are easy to confuse.
+
+          ### For a cdin build — bundled, not installed
+
+          A cdin build needs the mandatory set — the `vim` plugin, the `default`
+          theme and the fonts — because an editor without them cannot start. A
+          build copies them out of a cdin-x checkout:
+
+          ```sh
+          cd ../cdin
+          git clone https://github.com/m-mdy-m/cdin-x.git ../cdin-x
+          make                      # binary + bundle
+          # or, if the checkout is somewhere else:
+          make CDINX_DIR=/path/to/cdin-x
+          ```
+
+          `make bundle DEST=<dir>` here produces the same artifact. It is
+          attached below as `cdin-x-bundle-TAG.tar.gz`.
+
+          ### For a user — installed into the editor's site directory
+
+          ```sh
+          git clone https://github.com/m-mdy-m/cdin-x.git
+          cd cdin-x
+          make install              # copy
+          make link                 # symlink, for development
+          make uninstall            # remove
+          # restart cdin
+          ```
+
+          The default site directory is `<data_home>/cdin/site`, overridable with
+          `SITE=/full/path` or `SITE_NAME=<name>`.
+
+          ### After installing
+
+          | key | |
+          |-----|--|
+          | `ctrl+shift+p` | command palette |
+          | `ctrl+p` | find file |
+          | `ctrl+o` | open file |
+          | `ctrl+shift+o` | open folder |
+          | `m` (Normal mode) | plugin manager |
+
+          These bindings belong to the plugins, not to the editor. cdin's runtime
+          does not bind them, so an editor with nothing installed has no dead
+          keystrokes — and one with this installed gets them from here.
+
+          ### The contract
+
+          What cdin guarantees an extension, and what this repository may assume,
+          is written down in cdin's
+          [`docs/architecture/extension-contract.md`](https://github.com/m-mdy-m/cdin/blob/main/docs/architecture/extension-contract.md).
+          It is short. Read it before writing a plugin.
+
+          ---
+
+          NOTES
+          sed -i "s|TAG|$TAG|g" release_body.md
+
+      # Same approach as cdin's release.yml: credit the people whose commits
+      # are in this release, not everyone who ever contributed.
+      - name: Contributors
+        id: contributors
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.guard.outputs.tag }}
+        run: |
+          set -euo pipefail
+          current="$TAG"
+          prev=$(git tag --sort=v:refname | grep -B1 -x -F -- "$current" | head -1 || true)
+
+          if [ -z "$prev" ] || [ "$prev" = "$current" ]; then
+            header="## Contributors"
+            contrib=$(gh api "repos/${{ github.repository }}/contributors?per_page=100" \
+              --jq '.[].login' | grep -v 'github-actions\[bot\]' | sed 's/^/- @/')
+          else
+            header="## Contributors (${prev} → ${current})"
+            contrib=$(git log "${prev}..${current}" --format='%H' | while read -r sha; do
+                gh api "repos/${{ github.repository }}/commits/${sha}" \
+                  --jq '.author.login // empty' 2>/dev/null || true
+              done | grep -v '^$' | grep -v 'github-actions\[bot\]' \
+              | sort -u | sed 's/^/- @/')
+          fi
+
+          {
+            echo "header=${header}"
+            echo "list<<CDINX_EOF"
+            echo "${contrib}"
+            echo "CDINX_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Append contributors
+        shell: bash
+        env:
+          HEADER: ${{ steps.contributors.outputs.header }}
+          LIST: ${{ steps.contributors.outputs.list }}
+        run: |
+          {
+            echo ""
+            echo "$HEADER"
+            echo ""
+            echo "$LIST"
+          } >> release_body.md
+
+      - name: Create the release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ needs.guard.outputs.tag }}
+          name: cdin-x ${{ needs.guard.outputs.tag }}
+          body_path: release_body.md
+          files: release/*.tar.gz
+          draft: false
+          # From the tag's shape, in guard. A `-alpha.1` is a prerelease even
+          # if whoever pushed the tag said otherwise.
+          prerelease: ${{ needs.guard.outputs.prerelease == 'true' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

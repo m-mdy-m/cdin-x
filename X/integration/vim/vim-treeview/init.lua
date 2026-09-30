@@ -1,4 +1,4 @@
-﻿-- Vim treeview integration: :tree, the tree menu, and a context provider
+-- Vim treeview integration: :tree, the tree menu, and a context provider
 -- so the vim menu knows which directory the tree is sitting in.
 --
 -- It also re-scans the tree when the working directory changes, by

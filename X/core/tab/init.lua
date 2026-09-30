@@ -1,4 +1,4 @@
-﻿-- Manifest fields (name, version, description, ...) live inline below --
+-- Manifest fields (name, version, description, ...) live inline below --
 -- this used to be a separate manifest.lua that init.lua dofile'd; now
 -- it's just the top of the returned table, same as any single-file
 -- plugin. Everything else in this directory (the sibling .lua modules

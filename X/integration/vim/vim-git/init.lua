@@ -1,4 +1,4 @@
-﻿-- Git commands and a git menu section for Vim mode.
+-- Git commands and a git menu section for Vim mode.
 --
 -- Runs every git invocation through vim's shell capability
 -- (X.core.vim.shell) so output lands in a scratch buffer, and takes the

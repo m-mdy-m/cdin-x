@@ -1,0 +1,136 @@
+# Does `make install` actually work on this platform?
+#
+# cdin-x has nothing to compile, so the one thing that is genuinely
+# platform-dependent is the install: three directories copied (or linked) into
+# a path the *host* owns, on filesystems with different separators, link
+# semantics and permission rules. That is what this checks.
+#
+# Why one shell for three platforms: Git Bash is present on windows-latest, and
+# a single `shell: bash` means the three legs of the matrix run the same lines
+# rather than three near-copies that drift. All paths arrive through
+# CDIN_SITE_DIR — which install.py already reads as an override — so a Windows
+# separator never appears in a shell string.
+#
+# Why --symlink is POSIX-only here: on Windows creating a symlink needs
+# Developer Mode or an elevated shell, and a CI failure for that would say
+# nothing about cdin-x. Copy mode is the mode users get, so that is the one
+# checked on all three.
+
+name: Test install
+
+on:
+  workflow_call:
+    inputs:
+      os:
+        description: 'Runner label to run the install on.'
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  install:
+    name: ${{ inputs.os }}
+    runs-on: ${{ inputs.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.11'
+
+      - name: Install (copy)
+        shell: bash
+        env:
+          CDIN_SITE_DIR: ${{ runner.temp }}/site
+        run: |
+          set -euo pipefail
+          python scripts/install.py
+          for f in cdinx/init.lua X/manifest.lua plugins/cdin-x/init.lua; do
+            if [ ! -e "$CDIN_SITE_DIR/$f" ]; then
+              echo "::error::install did not place $f"
+              exit 1
+            fi
+          done
+          echo "✓ copy mode placed all three directories"
+
+      # The three directories, and nothing else. An install that also drops a
+      # manifest or a README next to them is a layout cdin does not know how to
+      # read, and it would be found here rather than by a user.
+      - name: Install writes nothing else
+        shell: bash
+        env:
+          CDIN_SITE_DIR: ${{ runner.temp }}/site
+        run: |
+          set -euo pipefail
+          actual=$(cd "$CDIN_SITE_DIR" && ls -1 | sort | tr '\n' ' ')
+          if [ "$actual" != "X cdinx plugins " ]; then
+            echo "::error::site directory contains: $actual"
+            echo "expected exactly: X cdinx plugins"
+            exit 1
+          fi
+
+      - name: Re-install is idempotent
+        shell: bash
+        env:
+          CDIN_SITE_DIR: ${{ runner.temp }}/site
+        run: |
+          set -euo pipefail
+          python scripts/install.py > /dev/null
+          echo "✓ second install over an existing one succeeded"
+
+      - name: Uninstall
+        shell: bash
+        env:
+          CDIN_SITE_DIR: ${{ runner.temp }}/site
+        run: |
+          set -euo pipefail
+          python scripts/install.py --uninstall
+          if [ -e "$CDIN_SITE_DIR/cdinx" ] || [ -e "$CDIN_SITE_DIR/X" ]; then
+            echo "::error::uninstall left cdinx/ or X/ behind"
+            exit 1
+          fi
+          echo "✓ uninstall removed everything it installed"
+
+      - name: Install (symlink)
+        if: runner.os != 'Windows'
+        shell: bash
+        env:
+          CDIN_SITE_DIR: ${{ runner.temp }}/site-link
+        run: |
+          set -euo pipefail
+          python scripts/install.py --symlink
+          # A link, not a copy: the point of --symlink is that editing the
+          # checkout changes what cdin loads, and a fallback to copy would
+          # silently turn development into a stale install.
+          if [ ! -L "$CDIN_SITE_DIR/cdinx" ]; then
+            echo "::error::--symlink did not create a link at cdinx/"
+            ls -la "$CDIN_SITE_DIR"
+            exit 1
+          fi
+          python scripts/install.py --uninstall
+          if [ -e "$CDIN_SITE_DIR/cdinx" ]; then
+            echo "::error::uninstall followed the link instead of unlinking it"
+            exit 1
+          fi
+          echo "✓ symlink mode links, and uninstall unlinks rather than deletes the target"
+
+      # The site directory name is the one value duplicated between the two
+      # repositories. cdin owns it; this script mirrors it. They cannot
+      # disagree silently because cdin's `make test-site-dir` reads this file,
+      # but that test needs a cdin checkout, so the mirror is checked here too.
+      - name: The mirrored site directory name is unchanged
+        shell: bash
+        run: |
+          set -euo pipefail
+          got=$(grep -oP '^SITE_DIRNAME = "\K[^"]+' scripts/install.py)
+          if [ "$got" != "site" ]; then
+            echo "::error::SITE_DIRNAME is '$got', expected 'site'"
+            echo "cdin's config.site_dirname changed; change both, deliberately"
+            exit 1
+          fi
+          echo "✓ SITE_DIRNAME matches cdin's config.site_dirname"

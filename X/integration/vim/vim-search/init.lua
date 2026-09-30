@@ -1,4 +1,4 @@
-﻿-- Vim search integration: the / n N * keys of vim mode, driven by cdin's
+-- Vim search integration: the / n N * keys of vim mode, driven by cdin's
 -- search plugin.
 --
 -- The search keys used to be hardcoded in X/core/vim/vimode.lua. They live

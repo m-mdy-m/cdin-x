@@ -2,6 +2,10 @@ version: 2
 
 updates:
   # ── GitHub Actions ──────────────────────────────────────────────────
+  # The only ecosystem here. cdin-x is Lua and data: no package manifest to
+  # bump, no Dockerfile to rebuild, no rockspec to resolve. Everything under
+  # .github/workflows/ is maintained here by hand instead — see the note at the
+  # bottom.
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
@@ -14,34 +18,4 @@ updates:
     labels:
       - "dependencies"
       - "ci"
-    open-pull-requests-limit: 5
-
-  # ── Docker ──────────────────────────────────────────────────────────
-  - package-ecosystem: "docker"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "09:00"
-      timezone: "Asia/Tehran"
-    commit-message:
-      prefix: "chore(docker)"
-    labels:
-      - "dependencies"
-      - "docker"
-    open-pull-requests-limit: 5
-
-  # ── Lua ─────────────────────────────────────────────────
-  - package-ecosystem: "luarocks"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "09:00"
-      timezone: "Asia/Tehran"
-    commit-message:
-      prefix: "chore(deps)"
-    labels:
-      - "dependencies"
-      - "lua"
     open-pull-requests-limit: 5
