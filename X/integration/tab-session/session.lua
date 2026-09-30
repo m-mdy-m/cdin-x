@@ -140,40 +140,66 @@ local function restore()
   core.log("tab-session: restored %d tab(s)", #tabs)
 end
 
--- ─── wire into quit ─────────────────────────────────────────────────────────
--- `session` (essential, always loaded) owns the single core.quit wrapper for
--- the whole X layer and exposes core.session.on_quit as a hook list; this
--- file is only required from tab-session's M.init(), and tab-session
--- declares "session" as a dependency, so core.session is guaranteed to
--- already be populated by the time we get here. Register here instead of
--- wrapping core.quit a second time.
-
-if core.session and core.session.on_quit then
-  core.session.on_quit(function(force)
-    core.log("X.integration.tab-session: on_quit fired, force=%s", tostring(force))
-    save()
-  end)
-else
-  -- Defensive fallback only — should not happen given the declared
-  -- dependency, but never silently drop tab-session persistence.
-  core.error("tab-session: core.session.on_quit unavailable; tab state will not be saved on quit")
-end
-
--- ─── delayed restore ─────────────────────────────────────────────────────────
-
-core.add_thread(function()
-  coroutine.yield(0.1)
-  restore()
-end)
-
+-- ─── registration ───────────────────────────────────────────────────────────
+-- register()/unregister(), not side effects at require time.
+--
+-- This file used to subscribe to session.on_quit, start the restore thread and
+-- add its command the moment it was required, and returned a table with only
+-- save/restore on it. tab-session's init.lua calls register() — which did not
+-- exist — so the integration never loaded at all, and the error was swallowed
+-- by the manager's pcall and logged as one line among many.
+--
+-- The seam is the convention every other integration follows: init.lua
+-- requires this and calls register(), and unload() calls unregister(). A
+-- require that registered things could not be undone, and `loaded` in
+-- init.lua would have been a lie about what had happened.
 local S = {}
 S.save    = save
 S.restore = restore
 
-command.add(nil, {
-  ["tab:session-save"] = function()
-    if S.save() then core.log("tab-session: saved") end
-  end,
-})
+-- Held so unregister() can hand the exact function back to off_quit, and so a
+-- second register() is a no-op rather than a duplicate subscription.
+local quit_hook = nil
+local restore_thread = nil
+
+local function on_quit(force)
+  core.log("X.integration.tab-session: on_quit fired, force=%s", tostring(force))
+  save()
+end
+
+function S.register()
+  if quit_hook then return end
+
+  -- `session` owns the single core.quit wrapper for the whole X layer, and
+  -- tab-session declares it as a dependency, so on_quit is available by now.
+  -- Subscribing through it rather than wrapping core.quit a second time is
+  -- what keeps one wrapper with several listeners.
+  local session = require "X.core.session.api"
+  quit_hook = session.on_quit(on_quit)
+
+  command.add(nil, {
+    ["tab:session-save"] = function()
+      if S.save() then core.log("tab-session: saved") end
+    end,
+  })
+
+  -- Delayed, not immediate: the root view has to exist and the first tab has
+  -- to be bootstrapped before there is anything to restore into.
+  restore_thread = function()
+    coroutine.yield(0.1)
+    restore()
+  end
+  core.add_thread(restore_thread)
+end
+
+function S.unregister()
+  if not quit_hook then return end
+
+  require("X.core.session.api").off_quit(quit_hook)
+  quit_hook = nil
+
+  command.remove("tab:session-save")
+  restore_thread = nil
+end
 
 return S

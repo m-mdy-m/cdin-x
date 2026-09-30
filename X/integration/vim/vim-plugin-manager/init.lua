@@ -1,9 +1,16 @@
 ﻿-- Vim bindings for the CDIN-X extension manager: the "M" key and a menu
 -- section pointing at it.
 --
--- The manager itself lives in cdin-x's own runtime (core/), not in X/core
--- â€” vim mode only needs to reach it. So there is no dependency on another
--- X plugin here, which is why this one declares only "vim".
+-- The manager itself lives in cdin-x's own runtime (cdinx/), not in X/, so
+-- there is no X plugin to depend on for reaching it.
+--
+-- vim-menu IS a dependency, and the reason is the menu rather than the
+-- manager: this extends "vim.main", which vim-menu defines, and
+-- menu.extend asserts that the menu exists. Without the declared dependency
+-- the load order is arbitrary, and a run that happened to load this first
+-- died with `menu is not defined: vim.main`. The manager's topological sort
+-- reads `dependencies`, so declaring it is what fixes the order — see
+-- cdinx/manager/deps.lua.
 --
 --   keymap.lua   the "M" normal-mode key
 --
@@ -19,7 +26,7 @@ local M = {
   category = "integration",
   type = "plugin",
   essential = false,
-  dependencies = { "vim", "menu" },
+  dependencies = { "vim", "menu", "vim-menu" },
   min_cdin_version = "0.5.0",
   tags = { "vim", "plugin-manager", "integration" },
 }
