@@ -1,43 +1,30 @@
 # session
 
-Persists state between runs: recent files, recent directories, the last
-directory, and the chosen theme.
+What survives a restart: recent files, recent directories, the last directory,
+and the chosen theme. The state is published as `core.session`.
 
-## Layout
+`api.lua` holds the state and its operations, `commands.lua` and `keymap.lua`
+the bindings, and `manager/` reads and writes the file.
 
-| file | role |
-|---|---|
-| `api.lua` | the state and its operations; published as `core.session` |
-| `commands.lua` | `session:*` commands |
-| `keymap.lua` | Ctrl+Shift+R / Ctrl+Shift+D / Ctrl+Alt+S |
-| `manager/sys.lua` | reading and writing the session file |
-| `manager/session-loader.lua` | loading helpers |
+## The seam
 
-## Extension seam
-
-`session` is essential, so it always loads and therefore owns the **single**
-wrap of `core.quit` for the whole X layer. Anything that needs to persist on
-exit subscribes instead of wrapping `core.quit` a second time — one
-wrapper, many listeners, and no risk of a dropped call if a second wrapper
-has a bug:
+Anything that needs to persist on exit subscribes rather than wrapping
+`core.quit` itself:
 
 ```lua
 require("X.core.session.api").on_quit(function(force) ... end)
 ```
 
-`off_quit(fn)` removes a listener again.
+`off_quit(fn)` removes a listener. One wrapper, many listeners, and no risk of
+a dropped call when the second wrapper has a bug — which is the reason this
+exists rather than each plugin saving on the way out.
 
-`set_theme(name)` records the active theme and saves immediately, so a
-choice made mid-session survives a crash rather than only a clean exit.
+`set_theme(name)` saves immediately rather than at exit, so a choice made
+mid-session survives a crash.
 
-## Note on Ctrl+Shift+D
+`session:*` commands are `open-recent`, `open-recent-dirs`, `save`, `clear` and
+`show-info`. <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd> is bound here *and* in
+cdin's default keymap, to `doc:duplicate-lines`; later registration wins, so
+this one takes it. Pre-existing behaviour, kept rather than silently changed.
 
-`ctrl+shift+d` is bound here and also in cdin's default keymap, to
-`doc:duplicate-lines`. Later registrations win, so this one takes it and
-duplicate-lines has to be reached another way. This is pre-existing
-behaviour, kept rather than silently changed.
-
-## Commands
-
-`session:open-recent`, `session:open-recent-dirs`, `session:save`,
-`session:clear`, `session:show-info`
+**Full page:** [session — what it does, what you press, and how it works](../../../docs/plugins/session.md)

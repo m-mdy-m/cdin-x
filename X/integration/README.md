@@ -1,53 +1,31 @@
-# X integrations
+# integration
 
-Integration plugins connect two or more otherwise independent X plugins.
+The wiring between capabilities. Nothing here implements anything — these
+directories exist so that two plugins which must not know about each other can
+still meet.
 
-The rule is simple:
+| directory | connects |
+| --- | --- |
+| `git-treeview/` | git status → tree badges and refresh |
+| `tab-session/` | the tab manager ↔ persistent session state |
+| `session/theme-switcher/` | the theme switcher → the session's saved theme |
+| [`vim/`](vim) | vim mode ↔ everything else |
 
-- `X/core/<plugin>` owns one capability and must not depend on another X plugin.
-- `X/integration/<plugin>` owns the wiring between capabilities.
-- Integration dependencies are declared in the manifest.
-- Prefer one integration per meaningful relationship, not dozens of one-off hooks.
-- UI providers should depend on generic primitives such as `menu`, not implement their own menu engine.
+An integration declares what it needs in its manifest, and that declaration is
+what the manager sorts the load order on:
 
-A category may group its plugins one level deeper, as `X/integration/vim/`
-does. The scanner descends into a directory that is not itself a plugin, and
-installing preserves the layout, so the grouping level never changes the
-module names a plugin uses to address another.
-
-## Shape
-
-```text
-X/integration/<ns>/<name>/
-  init.lua        manifest + register/unregister of the siblings
-  commands.lua    ex-commands or cdin commands      (register/unregister)
-  keymap.lua      key bindings                      (register/unregister)
-  *.lua           whatever else the wiring needs
+```lua
+dependencies = { "vim", "tab" }
 ```
 
-`init.lua` requires its siblings **inside `init()`**, never at module scope:
-the catalog reads `init.lua` with `dofile()` to discover the manifest, so a
-top-level `require` would run the whole subtree's side effects just to look
-the plugin up. It is also not the module other plugins require — see
-`X/README.md`.
+`make validate` checks every cross-plugin `require` and every menu extension
+against those declarations. A `require` with nothing behind it fails the build,
+which is the point — the alternative works until the other plugin is removed.
 
-An integration with nothing but a subscription (no commands, no keys) is
-still a legitimate integration: `X/integration/session/theme-switcher`
-exists only to connect two plugins that must not know about each other.
+**One trap.** `menu.extend(name, …)` *asserts* that the menu exists, so an
+integration extending a menu must declare the integration that **defines** it,
+not just the plugin that owns menus. Declare `menu` and extend `vim.main` and
+you get `menu is not defined: vim.main` on some runs and not others. The full
+story is in [docs/extending-vim.md](../../docs/extending-vim.md).
 
-## Current integrations
-
-- `git-treeview`: Git status → Treeview badges/refresh.
-- `tab-session`: tab manager + persistent session state.
-- `session/theme-switcher`: theme switcher → session theme persistence.
-- `vim-git`: Vim mode → Git commands/menu.
-- `vim-menu`: Vim mode → the generic menu, and the `m` key.
-- `vim-plugin-manager`: Vim mode → the CDIN-X extension manager, and `M`.
-- `vim-search`: Vim mode → Search plugin, and `/ n N *`.
-- `vim-tab`: Vim mode → Tab manager, `:tabnew`… and `gt`/`gT`.
-- `vim-treeview`: Vim mode → Treeview + menu, and `:tree`.
-- `vim-window`: Vim mode → Window manager, `:split`…, `Ctrl+W` and `Tab`.
-
-The `vim-*` plugins all extend vim through one registry,
-`X.core.vim.registry` — see `X/core/vim/README.md` for the full table of
-extension points and a worked example.
+**Full page:** [The ten `vim-*` integrations](../../docs/plugins/vim-integrations.md)

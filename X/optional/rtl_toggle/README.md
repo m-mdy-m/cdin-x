@@ -1,15 +1,11 @@
 # rtl_toggle
 
-Toggle right-to-left text direction at runtime.
+Switch text direction and Arabic shaping at runtime.
 
-## Installation
+<kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>R</kbd> cycles `auto` → `ltr` → `rtl`.
+<kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>S</kbd> toggles shaping on its own.
 
-Use CDIN's `m` menu → **Extensions**, then select `rtl_toggle`.
+Install it from the manager, like any other optional plugin. It is not part of a
+cdin build — only `vim` and the `default` theme are.
 
-## Runtime
-
-This extension is loaded only when installed and enabled. Essential CDIN extensions are shipped with the editor and cannot be removed.
-
-## License
-
-MIT
+**Full page:** [optional — what it does, what you press, and how it works](../../../docs/plugins/optional.md)

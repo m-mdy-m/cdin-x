@@ -1,15 +1,11 @@
 # theme_switcher
 
-Interactive theme selection and theme persistence.
+Pick a theme from a list, and keep the choice.
 
-## Installation
+The choice is persisted by [`session`](../../core/session), not by this plugin —
+this one sets it, and that one remembers it. Install it from the manager, or
+read
+[the theme registry on the host side](https://github.com/m-mdy-m/cdin/blob/main/docs/guides/themes.md)
+to add a theme of your own without installing anything.
 
-Use CDIN's `m` menu → **Extensions**, then select `theme_switcher`.
-
-## Runtime
-
-This extension is loaded only when installed and enabled. Essential CDIN extensions are shipped with the editor and cannot be removed.
-
-## License
-
-MIT
+**Full page:** [optional — what it does, what you press, and how it works](../../../docs/plugins/optional.md)

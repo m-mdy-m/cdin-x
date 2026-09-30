@@ -1,13 +1,16 @@
 # treeview
 
-The essential filesystem tree/sidebar, including Git state and file operations.
+The project tree: files and directories, with git state, and the file
+operations that belong on them.
 
-This extension is part of CDIN's built-in extension set and cannot be uninstalled.
+Git badges and refresh come from [`git-treeview`](../../integration/git-treeview)
+rather than from here. This plugin knows about files; the integration knows
+about the tree.
 
-## Implementation
+`:tree` and the vim bindings are in
+[`vim-treeview`](../../integration/vim/vim-treeview).
 
-The plugin keeps its public entry point in `init.lua` and isolates implementation modules beside it.
+Optional — install it from the manager. Only `vim` and the `default` theme are
+part of a cdin build.
 
-## License
-
-MIT
+**Full page:** [treeview — what it does, what you press, and how it works](../../../docs/plugins/treeview.md)

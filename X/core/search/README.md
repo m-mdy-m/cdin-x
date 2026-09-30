@@ -1,21 +1,22 @@
-# Search
+# search
 
-The `search` core plugin owns document search/replace and project-wide search.
-
-## Structure
+Document search and replace, and project-wide search.
 
 ```text
 search/
-├── manager/
-│   └── init.lua   # shared state, document helpers, highlight state
-├── buffer.lua     # document search / find / replace behavior
-├── project.lua    # project-wide search results view and search behavior
-├── commands.lua   # command registration only
-├── keymap.lua     # default keymap registration only
-├── init.lua        # plugin lifecycle / assembly
-└── manifest.lua    # plugin metadata
+├── manager/    shared state, document helpers, highlight state
+├── buffer.lua  document search, find, replace
+├── project.lua project-wide results view
+├── commands.lua
+├── keymap.lua
+└── init.lua    the manifest, and assembly
 ```
 
-`buffer.lua` and `project.lua` intentionally do not register commands or keymaps.
-Shared state and helpers belong to `manager/`; command and keymap wiring are kept
-separate so integrations can depend on the search API without pulling in bindings.
+`buffer.lua` and `project.lua` register nothing. Commands and bindings live in
+their own files on purpose, so an integration can use the search API without
+also inheriting search's keys.
+
+The manifest is inline in `init.lua` — there is no `manifest.lua` in this
+plugin, and there is no such file in the catalog.
+
+**Full page:** [search — what it does, what you press, and how it works](../../../docs/plugins/search.md)

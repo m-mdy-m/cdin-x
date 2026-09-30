@@ -1,15 +1,12 @@
 # unicode_inspect
 
-Inspect Unicode code points around the caret.
+Shows the Unicode code points around the caret, or across the selection.
 
-## Installation
+<kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>U</kbd>, or `unicode:inspect` in the command
+palette. It works on the selection when there is one and on the character under
+the caret when there isn't.
 
-Use CDIN's `m` menu → **Extensions**, then select `unicode_inspect`.
+Scoped to a document view, so it is only offered when there is a document to
+inspect.
 
-## Runtime
-
-This extension is loaded only when installed and enabled. Essential CDIN extensions are shipped with the editor and cannot be removed.
-
-## License
-
-MIT
+**Full page:** [optional — what it does, what you press, and how it works](../../../docs/plugins/optional.md)
