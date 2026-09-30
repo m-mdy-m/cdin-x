@@ -257,7 +257,7 @@ function M.register()
   end
 
   -- The directory and the theme are already restored synchronously by
-  -- core.init() before the first frame (see data/core/init.lua). All that
+  -- core.init() before the first frame. All that
   -- is left is optionally reopening the last file, which still has to wait
   -- for the views to exist — hence the thread. core.try already guards it,
   -- so a bad restore cannot block startup either way.

@@ -69,6 +69,11 @@ function M.run_in_buffer(cmd)
   local doc = Doc()
   doc:text_input(content)
   doc:set_selection(1, 1)
+  -- The output is not a file the user edited, so it is not unsaved work.
+  -- text_input() moved the undo index, which left the doc dirty; without
+  -- clean() every :q after a :! asked to discard "unsaved changes" to a
+  -- buffer of command output.
+  doc:clean()
   doc.name = ":!" .. cmd
   function doc:get_name() return self.name end
   core.root_view:open_doc(doc)

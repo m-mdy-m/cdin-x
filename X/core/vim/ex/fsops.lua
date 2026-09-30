@@ -57,6 +57,13 @@ function M.show_ls(path)
   local doc = Doc()
   doc:text_input(table.concat(lines, "\n"))
   doc:set_selection(1, 1)
+  -- This is command *output*, not a file the user is editing. Faking
+  -- get_name() alone was not enough: text_input() moved the undo index, so
+  -- the doc stayed dirty forever, had no filename to save to, and every
+  -- :q afterwards asked whether to discard "unsaved changes" to a listing
+  -- that is not theirs to change. clean() is the runtime's own answer to
+  -- "this doc is not modified".
+  doc:clean()
   function doc:get_name() return "ls " .. path end
   core.root_view:open_doc(doc)
 end

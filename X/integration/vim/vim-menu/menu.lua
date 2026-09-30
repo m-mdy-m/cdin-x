@@ -43,6 +43,9 @@ local function network_info()
   local doc = require("core.doc")()
   doc:text_input("-- network info\n\n" .. out)
   doc:set_selection(1, 1)
+  -- Command output, not a file the user edited. Without clean() the doc stays
+  -- dirty and every :q after :net offers to discard "unsaved changes" to it.
+  doc:clean()
   function doc:get_name() return ":net" end
   core.root_view:open_doc(doc)
 end
