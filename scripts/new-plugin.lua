@@ -3,9 +3,13 @@ local category = arg[2] or "utils"
 
 if not name or not name:match("^[%w%._%-]+$") then
   print("Usage: lua scripts/new-plugin.lua <name> [category]")
-  print("  For themes: lua scripts/new-plugin.lua <name> theme")
+  print("  categories: core, integration, optional, syntax")
+  print("  For a theme: lua scripts/new-plugin.lua <name> themes")
   os.exit(1)
 end
+
+-- `theme` is what people type; the directory is `themes`.
+if category == "theme" then category = "themes" end
 
 local base = "X/" .. category .. "/" .. name
 local function mkdir(path)
@@ -22,10 +26,16 @@ mkdir(base)
 local files = {}
 
 if category == "themes" then
-  -- Themes are simplified: just theme.lua
+  -- A theme is just theme.lua, in a directory named for the theme. That is
+  -- the layout the host's theme registry reads, so this file can be handed
+  -- to core.themes.add_root() as-is.
   files[base .. "/theme.lua"] = string.format([[-- %s theme
+--
+-- A theme is a table of colours, applied by the host's theme registry.
+-- `essential = false` keeps it out of the mandatory set a cdin build bundles.
 return {
   name = %q,
+  essential = false,
   background = "#1e1e2e", background2 = "#181825", background3 = "#313244",
   text = "#cdd6f4", caret = "#f5e0dc",
   accent = "#cba6f7",
@@ -48,36 +58,53 @@ return {
 }
 ]], name, name)
 else
-  -- Plugins use init.lua, manifest.lua, README.md.
-  files[base .. "/init.lua"] = string.format([[local function plugin_dir()
-  local src = debug.getinfo(1, "S").source:match("^@(.+)$")
-  return src:match("^(.*)[/\\][^/\\]+$")
-end
-
-local M = dofile(plugin_dir() .. "/manifest.lua")
-M.config = {}
-
-function M.init(core, config)
-  core.log("%s loaded")
-end
-
-function M.unload()
-end
-
-return M
-]], name)
-
-  files[base .. "/manifest.lua"] = string.format([[return {
+  -- One file: init.lua carries the manifest inline and the lifecycle.
+  --
+  -- There is no separate manifest.lua. The catalog reads this file with
+  -- dofile() to discover the manifest, so everything else is required inside
+  -- init() — a top-level require would run the whole subtree's side effects
+  -- just to look the plugin up.
+  --
+  -- `essential` is false, and it should stay false unless a cdin build is
+  -- unusable without this plugin: essential plugins are the ones
+  -- scripts/bundle.py copies into a build, and they must be
+  -- self-contained. See docs/architecture/extension-contract.md.
+  files[base .. "/init.lua"] = string.format([[-- %s
+--
+-- The manifest is inline. Nothing is required at the top of this file, so
+-- the catalog can dofile() it to read the manifest without loading the
+-- plugin; requires go inside init().
+local M = {
   name = %q,
   version = "0.1.0",
-  description = %q,
+  description = "A CDIN-X extension",
+  author = "cdin Team",
+  license = "MIT",
   category = %q,
   type = "plugin",
   essential = false,
   dependencies = {},
   min_cdin_version = "0.5.0",
 }
-]], name, "A CDIN extension", category)
+
+M.config = {}
+
+local loaded = false
+
+function M.init(core, config)
+  if loaded then return end
+  loaded = true
+  core.log("%s loaded", M.name)
+end
+
+function M.unload()
+  if not loaded then return end
+  -- Remove whatever init() registered: commands, keymaps, hooks.
+  loaded = false
+end
+
+return M
+]], name, name, category)
 
   files[base .. "/README.md"] = string.format([[# %s
 
@@ -89,7 +116,8 @@ Document the extension here.
 
 ## Development
 
-Test locally from the CDIN-X manager before submitting a pull request.
+Install it into a site with `make link`, then load it from the CDIN-X
+manager. Run `make validate` before submitting a pull request.
 ]], name)
 end
 

@@ -9,20 +9,20 @@
 -- root, so callers can fetch them individually without cloning.
 return {
   core_files = {
-    "core/command.lua",
-    "core/config.lua",
-    "core/init.lua",
-    "core/manager/catalog.lua",
-    "core/manager/deps.lua",
-    "core/manager/git.lua",
-    "core/manager/init.lua",
-    "core/manager/lifecycle.lua",
-    "core/manager/runtime.lua",
-    "core/manager/state.lua",
-    "core/manager/util.lua",
-    "core/manifest.lua",
-    "core/panel.lua",
-    "core/preboot.lua",
+    "cdinx/README.md",
+    "cdinx/command.lua",
+    "cdinx/config.lua",
+    "cdinx/init.lua",
+    "cdinx/manager/catalog.lua",
+    "cdinx/manager/deps.lua",
+    "cdinx/manager/init.lua",
+    "cdinx/manager/lifecycle.lua",
+    "cdinx/manager/registry.lua",
+    "cdinx/manager/runtime.lua",
+    "cdinx/manager/state.lua",
+    "cdinx/manager/util.lua",
+    "cdinx/manifest.lua",
+    "cdinx/panel.lua",
   },
   plugins = {
     ["autocomplete"] = {
@@ -85,17 +85,7 @@ return {
       description = "Theme: catppuccin-mocha",
       essential = false,
       files = {
-        "X/themes/catppuccin-mocha.lua",
-      },
-    },
-    ["core"] = {
-      category = "core",
-      type = "plugin",
-      version = "0.2.0",
-      description = "CDIN built-in core extensions",
-      essential = true,
-      files = {
-        "X/core/cdin_x_bundle.lua",
+        "X/themes/catppuccin-mocha/theme.lua",
       },
     },
     ["default"] = {
@@ -105,7 +95,7 @@ return {
       description = "Theme: default",
       essential = true,
       files = {
-        "X/themes/default.lua",
+        "X/themes/default/theme.lua",
       },
     },
     ["dracula"] = {
@@ -115,7 +105,18 @@ return {
       description = "Theme: dracula",
       essential = false,
       files = {
-        "X/themes/dracula.lua",
+        "X/themes/dracula/theme.lua",
+      },
+    },
+    ["finder"] = {
+      category = "core",
+      type = "plugin",
+      version = "0.1.0",
+      description = "Find a file by name, open a file or folder by path",
+      essential = false,
+      files = {
+        "X/core/finder/README.md",
+        "X/core/finder/init.lua",
       },
     },
     ["git"] = {
@@ -153,7 +154,7 @@ return {
       description = "Theme: github-light",
       essential = false,
       files = {
-        "X/themes/github-light.lua",
+        "X/themes/github-light/theme.lua",
       },
     },
     ["gruvbox-dark"] = {
@@ -163,7 +164,7 @@ return {
       description = "Theme: gruvbox-dark",
       essential = false,
       files = {
-        "X/themes/gruvbox-dark.lua",
+        "X/themes/gruvbox-dark/theme.lua",
       },
     },
     ["javascript"] = {
@@ -208,6 +209,17 @@ return {
         "X/core/menu/init.lua",
       },
     },
+    ["modules"] = {
+      category = "core",
+      type = "plugin",
+      version = "0.1.0",
+      description = "Reload a loaded module, open the user or project config module",
+      essential = false,
+      files = {
+        "X/core/modules/README.md",
+        "X/core/modules/init.lua",
+      },
+    },
     ["monokai"] = {
       category = "themes",
       type = "theme",
@@ -215,7 +227,7 @@ return {
       description = "Theme: monokai",
       essential = false,
       files = {
-        "X/themes/monokai.lua",
+        "X/themes/monokai/theme.lua",
       },
     },
     ["nord"] = {
@@ -225,7 +237,18 @@ return {
       description = "Theme: nord",
       essential = false,
       files = {
-        "X/themes/nord.lua",
+        "X/themes/nord/theme.lua",
+      },
+    },
+    ["palette"] = {
+      category = "core",
+      type = "plugin",
+      version = "0.1.0",
+      description = "Command palette: run any command by name",
+      essential = false,
+      files = {
+        "X/core/palette/README.md",
+        "X/core/palette/init.lua",
       },
     },
     ["python"] = {
@@ -299,7 +322,7 @@ return {
       description = "Theme: solarized-dark",
       essential = false,
       files = {
-        "X/themes/solarized-dark.lua",
+        "X/themes/solarized-dark/theme.lua",
       },
     },
     ["solarized-light"] = {
@@ -309,7 +332,7 @@ return {
       description = "Theme: solarized-light",
       essential = false,
       files = {
-        "X/themes/solarized-light.lua",
+        "X/themes/solarized-light/theme.lua",
       },
     },
     ["tab"] = {
@@ -359,7 +382,7 @@ return {
       description = "Theme: tokyo-night",
       essential = false,
       files = {
-        "X/themes/tokyo-night.lua",
+        "X/themes/tokyo-night/theme.lua",
       },
     },
     ["treeview"] = {
