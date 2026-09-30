@@ -24,7 +24,17 @@ end
 
 local base_config = config_home .. sep .. "cdin"
 local base_data   = data_home .. sep .. "cdin"
-config.site_dir       = config.site_dir or (env("CDIN_SITE_DIR") or (base_data .. sep .. "site"))
+
+-- The site directory: where an installed cdin-x lives, and where the host's
+-- plugin loader looks for site plugins.
+--
+-- The host owns this value. config.site_path() is the host's own resolver,
+-- and it is the single place the directory's *name* is defined — so honouring
+-- it here is what makes `config.site_dirname = "extensions"` in a user's
+-- init.lua rename the directory for cdin-x as well. Computing a path here
+-- instead would give the two halves different answers, and the loader would
+-- look where the installer never wrote.
+config.site_dir       = config.site_path()
 
 config.user_root      = config.user_root or base_config
 config.user_dir       = config.user_dir or (base_config .. sep .. "user")
