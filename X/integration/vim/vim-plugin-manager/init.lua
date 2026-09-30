@@ -1,4 +1,4 @@
-﻿-- Vim bindings for the CDIN-X extension manager: the "M" key and a menu
+-- Vim bindings for the CDIN-X extension manager: the "M" key and a menu
 -- section pointing at it.
 --
 -- The manager itself lives in cdin-x's own runtime (cdinx/), not in X/, so

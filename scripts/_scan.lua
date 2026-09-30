@@ -171,7 +171,22 @@ function M.list_dir(path)
     command = 'powershell -NoProfile -Command "Get-ChildItem -LiteralPath \'' .. p ..
       '\' -Force | ForEach-Object { if ($_.PSIsContainer) { \'DIR \' + $_.Name } else { \'FILE \' + $_.Name } }"'
   else
-    command = "ls -A " .. shell_quote(path) .. " 2>/dev/null"
+    -- The parser below reads a "KIND name" pair, and only the PowerShell
+    -- branch used to emit one. `ls -A` prints bare names, so every line failed
+    -- the pattern and list_dir returned {} -- on every POSIX system. Nothing
+    -- looked broken: `make manifest` reported "0 extensions" and wrote a
+    -- 29-line X/manifest.lua over the 573-line catalog index, and
+    -- CONTRIBUTING.md tells contributors to run exactly that and commit the
+    -- result.
+    --
+    -- Two `find` passes, one per kind, each prefixed, because `find -printf` is
+    -- GNU-only and this has to work on macOS too. `-mindepth`/`-maxdepth` are
+    -- in BSD find, and `basename` and `sed` are in both.
+    local q = shell_quote(path)
+    command = "{ find " .. q .. " -mindepth 1 -maxdepth 1 -type d -exec basename {} \\; "
+           .. "| sed 's|^|DIR |' ; "
+           .. "find " .. q .. " -mindepth 1 -maxdepth 1 -type f -exec basename {} \\; "
+           .. "| sed 's|^|FILE |' ; } 2>/dev/null"
   end
 
   local handle = io.popen(command)

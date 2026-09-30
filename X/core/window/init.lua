@@ -1,4 +1,4 @@
-﻿local M = {
+local M = {
   name = "window",
   version = "0.2.0",
   description = "Window splits, focus and layout management",

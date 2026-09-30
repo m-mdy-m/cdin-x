@@ -1,0 +1,128 @@
+# Verify the catalog, then produce the artifact a cdin build consumes.
+#
+# Called by ci.yml (every push and PR) and by release.yml (every tag). It is the
+# only place that decides "is this tree shippable", so both callers get the same
+# answer rather than the release path being a second, laxer implementation.
+#
+# There is no build here. cdin-x is Lua and data: nothing is compiled, nothing
+# is linked, and no platform matrix is meaningful. What exists instead is the
+# gate (`make validate`) and the one thing cdin reads out of this repository —
+# `scripts/bundle.py`'s output.
+#
+# The idempotence check here is deliberately stronger than the one inside
+# validate.lua: that one re-runs bundle.py over the same directory and compares
+# BUNDLE.lua. This runs it twice into two separate directories and compares the
+# whole trees, so a file that appears on the second pass fails here.
+
+name: Bundle
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: 'Release tag this bundle belongs to, e.g. v0.1.0. Used only for the filename.'
+        type: string
+        default: ''
+      upload:
+        description: 'Upload the bundle as a workflow artifact.'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Validate + bundle
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # No third-party action for this. apt is on the runner image already, and
+      # a Lua build step is the only tool cdin-x's quality gate needs.
+      - name: Install Lua 5.4
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends lua5.4
+          lua5.4 -v
+          # validate.lua spawns `CDIN_PYTHON` and the Makefile's default is
+          # `lua`, so make `lua` exist regardless of how the runner images
+          # decide to alias it.
+          command -v lua >/dev/null 2>&1 || \
+            sudo ln -sf "$(command -v lua5.4)" /usr/local/bin/lua
+          lua -v
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.11'
+
+      # The quality gate. This is the same target .husky/pre-commit is supposed
+      # to run and `make validate` runs by hand — it checks the required files,
+      # the essential set, the theme layout, dependency rules, the two
+      # independence rules (no EXEDIR, no core.x), self-containment of every
+      # essential plugin, the register/unregister seam, and the bundle's own
+      # file set.
+      - name: Validate the catalog
+        env:
+          CDIN_PYTHON: python3
+        run: |
+          make validate LUA=lua5.4
+          lua5.4 scripts/plugin-list.lua > /dev/null
+          echo "✓ catalog walks cleanly"
+
+      - name: Bundle (first pass)
+        run: |
+          python3 scripts/bundle.py --out "$RUNNER_TEMP/bundle-1"
+          echo "--- files ---"
+          ( cd "$RUNNER_TEMP/bundle-1" && find . -type f | sort )
+
+      - name: Bundle (second pass) and compare the whole trees
+        run: |
+          python3 scripts/bundle.py --out "$RUNNER_TEMP/bundle-2"
+          if ! diff -r "$RUNNER_TEMP/bundle-1" "$RUNNER_TEMP/bundle-2"; then
+            echo "::error::bundle.py is not idempotent across two clean runs"
+            exit 1
+          fi
+          echo "✓ two clean runs are byte-identical"
+
+      # Belt and braces, and cheap: validate.lua already asserts this set, but
+      # it does so from Lua, and a release tag should not depend on one
+      # interpreter's idea of what a path separator is.
+      - name: Assert the essential set is present
+        run: |
+          cd "$RUNNER_TEMP/bundle-1"
+          missing=0
+          for f in BUNDLE.lua plugins/vim.lua themes/default/theme.lua \
+                   X/core/vim/init.lua X/core/vim/registry.lua \
+                   X/core/vim/ex/init.lua fonts/font.ttf \
+                   fonts/monospace.ttf fonts/icons.ttf; do
+            if [ ! -f "$f" ]; then
+              echo "::error::bundle is missing $f"
+              missing=1
+            fi
+          done
+          [ "$missing" -eq 0 ] || exit 1
+          echo "✓ essential set present"
+
+      - name: Tar the bundle
+        id: pack
+        run: |
+          name="cdin-x-bundle${{ inputs.tag && format('-{0}', inputs.tag) || '' }}"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          tar -czf "$RUNNER_TEMP/$name.tar.gz" -C "$RUNNER_TEMP/bundle-1" .
+          ls -lh "$RUNNER_TEMP/$name.tar.gz"
+
+      - name: Upload the bundle
+        if: inputs.upload
+        uses: actions/upload-artifact@v7
+        with:
+          name: cdin-x-bundle
+          # Named without the tag: the release job renames it when it attaches
+          # the asset, and two uploads with different names would only make
+          # download-artifact's pattern matching ambiguous.
+          path: ${{ runner.temp }}/cdin-x-bundle*.tar.gz
+          if-no-files-found: error
+          retention-days: 14
