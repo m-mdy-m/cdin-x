@@ -10,6 +10,7 @@
 local core     = require "core"
 local config   = require "core.config"
 local exec     = require "X.core.git.exec"
+local Ops      = require "X.core.git.manager.ops"
 local status   = require "X.core.git.status"
 local recipes  = require "X.core.git.recipes"
 
@@ -33,27 +34,43 @@ M.status   = status
 -- to hand to X.core.vim.shell.run_in_buffer().
 M.recipes  = recipes
 
+-- Fetching the extension registry (clone/pull) is a git operation, so it
+-- lives here rather than in core. See M.sync_registry in manager/ops.lua.
+M.sync_registry = Ops.sync_registry
+
 -- ── core integration point ──────────────────────────────────────────────
--- data/core is runtime-only, so it knows nothing about git. It exposes
--- two tiny generic hooks instead (see core.register_vcs_provider in
--- data/core/project.lua and statusview.lua) and degrades to "no vcs info"
+-- core is runtime-only, so it knows nothing about git. It exposes
+-- tiny generic hooks instead (see core.register_vcs_provider in
+-- the host's project scanner and status view) and degrades to "no vcs info"
 -- when no plugin registers one:
 --   is_ignored(abs_path)     -> boolean
 --   refresh_ignored_now()    -> nil, best-effort, pcall'd by the caller
 --   status                   -> table the status bar reads for the
 --                               branch / ahead / behind / dirty pill
+--
+-- The second hook is the registry syncer: core/manager/registry.lua will
+-- pull or clone the cdin-x catalog, but it refuses to know that git exists.
+-- If this extension is not loaded, refreshing the catalog reports that it is
+-- unavailable instead of silently doing nothing.
 local registered = false
 
 function M.register()
   if registered then return end
+
   if core.register_vcs_provider then
     core.register_vcs_provider({
       is_ignored          = status.is_ignored,
       refresh_ignored_now = status.refresh_ignored_now,
       status              = status,
     })
-    registered = true
   end
+
+  local manager = require "cdinx.manager"
+  if manager.set_registry_syncer then
+    manager.set_registry_syncer(Ops.sync_registry)
+  end
+
+  registered = true
 end
 
 function M.unregister()

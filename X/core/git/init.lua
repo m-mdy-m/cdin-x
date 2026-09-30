@@ -1,6 +1,6 @@
--- Git/VCS support, moved out of cdin core (was data/core/git/).
+-- Git/VCS support, moved out of the editor runtime.
 --
--- data/core is runtime-only; a plain-text editor works with zero
+-- The editor runtime is runtime-only; a plain-text editor works with zero
 -- knowledge of git, so this whole capability now lives here as a plugin.
 --
 -- This file is only the manifest and the load point. The module consumers
