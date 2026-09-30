@@ -214,18 +214,25 @@ function M.list_files_recursive(dir)
   return results
 end
 
+-- A theme is a directory holding theme.lua — the same layout the host's
+-- theme registry uses (<root>/<name>/theme.lua), so a theme can be handed
+-- straight to core.themes.add_root() without being copied or renamed.
 function M.theme_entries()
   local entries = {}
   local themes_dir = "X/themes"
   if not M.exists(themes_dir) then return entries end
   for _, entry in ipairs(M.list_dir(themes_dir) or {}) do
-    if entry.type == "file" then
-      local name = entry.name:match("^(.+)%.lua$")
-      if name then
-        local path = themes_dir .. "/" .. entry.name
+    if entry.type == "dir" and entry.name ~= ".git" then
+      local path = themes_dir .. "/" .. entry.name .. "/theme.lua"
+      if M.exists(path) then
         local ok, data = pcall(dofile, path)
         if ok and type(data) == "table" then
-          entries[#entries + 1] = { name = name, path = path, data = data }
+          entries[#entries + 1] = {
+            name = data.name or entry.name,
+            path = path,
+            base = themes_dir .. "/" .. entry.name,
+            data = data,
+          }
         end
       end
     end

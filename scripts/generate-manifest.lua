@@ -1,3 +1,9 @@
+-- Regenerates X/manifest.lua, the generated catalog index.
+--
+-- The manager does not read this file: it scans the filesystem. It exists
+-- so a consumer can see the whole catalog — and each entry's file list —
+-- without walking the tree, and so `essential` is stated once, in the
+-- plugin, instead of being repeated in a manifest that can drift from it.
 local scan = dofile("scripts/_scan.lua")
 
 local function q(s)
@@ -20,6 +26,8 @@ for _, entry in ipairs(scan.plugin_entries()) do
   end
 end
 
+-- A theme is a directory with theme.lua, so its file list is the directory
+-- rather than the one file: the host may add assets beside the theme file.
 for _, theme in ipairs(scan.theme_entries()) do
   plugins[theme.name] = {
     category = "themes",
@@ -27,7 +35,7 @@ for _, theme in ipairs(scan.theme_entries()) do
     version = "0.1.0",
     description = "Theme: " .. theme.name,
     essential = theme.data.essential == true,
-    files = { theme.path },
+    files = theme.base and scan.list_files_recursive(theme.base) or { theme.path },
   }
 end
 
@@ -49,7 +57,9 @@ local lines = {
   "  core_files = {",
 }
 
-for _, f in ipairs(scan.list_files_recursive("core")) do
+-- The manager's own modules. Listed so a consumer can tell the difference
+-- between "an extension" and "the thing that manages extensions".
+for _, f in ipairs(scan.list_files_recursive("cdinx")) do
   lines[#lines + 1] = "    " .. q(f) .. ","
 end
 
@@ -75,10 +85,15 @@ end
 lines[#lines + 1] = "  },"
 lines[#lines + 1] = "}"
 
-local fp, err = io.open("X/manifest.lua", "w")
+-- X/manifest.lua has always been written with CRLF, and it stays that way.
+-- What is new is that the endings are written deliberately: in text mode
+-- the C runtime translates \n to \r\n on Windows and not on Linux, so the
+-- same checkout produced two different files depending on who ran it. Binary
+-- mode with an explicit separator means one script and one answer.
+local fp, err = io.open("X/manifest.lua", "wb")
 if not fp then error(err) end
-fp:write(table.concat(lines, "\n"), "\n")
+fp:write(table.concat(lines, "\r\n"), "\r\n")
 fp:close()
 
-print(string.format("generated X/manifest.lua with %d extensions (+ %d core files)",
-  #names, #scan.list_files_recursive("core")))
+print(string.format("generated X/manifest.lua with %d extensions (+ %d manager files)",
+  #names, #scan.list_files_recursive("cdinx")))
