@@ -56,6 +56,10 @@ function M.show()
   local doc = Doc()
   doc:text_input(table.concat(parts, ""))
   doc:set_selection(1, 1)
+  -- Generated text, not a file the user edited: text_input() moved the undo
+  -- index, which left the doc dirty, and a :q after :help then asked to
+  -- discard "unsaved changes" to the help text.
+  doc:clean()
   function doc:get_name() return ":help" end
   core.root_view:open_doc(doc)
 end

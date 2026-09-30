@@ -7,7 +7,7 @@
 -- unbound, so no default stroke is taken away from the user for it.
 --
 -- ctrl+shift+; is unused by cdin's default keymap (see
--- data/core/keymaps/default.lua) and by every plugin in X/, so binding it
+-- the host's default keymap) and by every plugin here, so binding it
 -- here cannot shadow an existing shortcut.
 local keymap = require "core.input.keymap"
 

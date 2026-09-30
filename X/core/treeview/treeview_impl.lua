@@ -22,8 +22,15 @@ table.insert(project._after_root_change, function()
   Cache.flush()
 end)
 
-config.treeview_size            = 200 * SCALE
-config.show_hidden_files        = true
+-- Defaults, guarded so a user who set them in their own init.lua keeps their
+-- value. Assigning unconditionally would silently overwrite a config the user
+-- can see working in their file.
+if config.treeview_size == nil then
+  config.treeview_size = 200 * SCALE
+end
+if config.show_hidden_files == nil then
+  config.show_hidden_files = true
+end
 
 if config.show_hidden_files then
   config.ignore_files = "^$"

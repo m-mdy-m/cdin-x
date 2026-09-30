@@ -46,6 +46,23 @@ local loaded = nil
 function M.init(core, config)
   if loaded then return end
 
+  -- Apply this plugin's own default, before anything reads it.
+  --
+  -- M.config above is a declaration, not an application: nothing in the
+  -- runtime copies it onto config, so a default written there and nowhere
+  -- else is simply never set. Every gate in vim mode tests
+  -- `if not config.vim_mode_enabled then return false end`, so with the
+  -- value left nil the key handler bails on the first keystroke and vim mode
+  -- is silently off — which looks exactly like "vim is not loaded" and sends
+  -- you looking for a key to turn it on with.
+  --
+  -- The guard is `== nil`, not `=`, so a user who set it in their
+  -- ~/.config/cdin/user/init.lua keeps their value. That file runs before
+  -- plugins, which is why this works.
+  if config.vim_mode_enabled == nil then
+    config.vim_mode_enabled = M.config.vim_mode_enabled
+  end
+
   local ex       = require "X.core.vim.ex"
   local vimode   = require "X.core.vim.vimode"
   local commands = require "X.core.vim.commands"

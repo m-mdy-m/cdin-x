@@ -7,8 +7,12 @@ local MAP = {
   ["shift+r"]        = "find-replace:previous-find",
   ["ctrl+shift+h"]   = "find-replace:clear-highlight",
   ["f4"]             = "find-replace:repeat-find",
-  -- prepended so it wins over the default doc:select-word, which Ctrl+D
-  -- also owns
+  -- Ctrl+D is owned by doc:select-word too. A list is a fallback chain, not
+  -- an override: the commands are tried in order and the first one whose
+  -- predicate holds runs. So the search takes it while a match is selected,
+  -- and select-word takes it the rest of the time. The `true` below replaces
+  -- whatever stroke the default keymap already had, which is what we want —
+  -- adding without it would prepend and leave the old chain in front.
   ["ctrl+d"]         = { "find-replace:select-next", "doc:select-word" },
 
   ["f5"]           = "project-search:refresh",
