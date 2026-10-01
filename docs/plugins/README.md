@@ -12,6 +12,7 @@ One thing each. Install from the manager and they work on their own.
 
 | page | plugin | what it is |
 | --- | --- | --- |
+| [manager](manager.md) | `manager` | the extension panel — **always bundled**, like vim |
 | [vim](vim.md) | `vim` | modal editing and the `:` command line — **always loaded** |
 | [search](search.md) | `search` | find, replace, and search across the project |
 | [menu](menu.md) | `menu` | the generic searchable menu other plugins build on |

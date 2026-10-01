@@ -19,6 +19,6 @@ than a path computed here, so a user who renames the site directory renames it
 for both halves at once.
 
 The catalog merges three roots — this repository's `X/` (builtin), the user's
-own store (installed), and a clone of the registry — with later sources
+own store (installed), and the cached catalog index of the registry — with later sources
 winning. The full table of what that means in practice is in
 [docs/installing-plugins.md](../docs/installing-plugins.md).

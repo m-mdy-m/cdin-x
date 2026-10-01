@@ -24,15 +24,22 @@ broken" and "an extension misbehaves" stop being the same investigation.
 
 ## Two kinds of thing live here
 
-**The mandatory set**: the `vim` plugin, the `default` theme, and the fonts.
-A cdin build without these is not a working editor, so a build copies them in
-from this repository. They are selected by a marker — `essential = true` in a
-plugin's manifest — and exactly two things carry it: `vim` and the `default`
-theme. Nothing else does, and `make validate` fails if the count is wrong.
+**The mandatory set**: the `vim` plugin, the extension `manager`, the `default`
+theme, and the fonts. A cdin build without these is not a working editor, so a
+build copies them in from this repository. They are selected by a marker —
+`essential = true` in a plugin's manifest — and exactly three things carry it:
+`vim`, `manager`, and the `default` theme. Nothing else does, and
+`make validate` fails if the count is wrong.
+
+The manager is in that list because an editor whose only answer to "what is
+installed, and how do I change that" is a script in another directory is a
+half-finished editor, and the person who finds out is always the one who just
+installed something. Everything it *offers* stays optional; what is not optional
+is the ability to ask.
 
 **Everything else**: the command palette, the file finders, the project tree,
 tabs, search, git, the themes beyond the default. A user installs these from
-inside the editor, and the in-app manager handles them from there.
+inside the editor, and the manager handles them from there.
 
 ## Install
 
@@ -68,7 +75,7 @@ make link SITE=/somewhere/else         # or a full path, which wins
 
 ## Then, from inside cdin
 
-<kbd>Shift</kbd>+<kbd>M</kbd> opens the manager. Pick something, press
+<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>M</kbd> opens the manager (<kbd>Shift</kbd>+<kbd>M</kbd> in vim normal mode, with `vim-plugin-manager`). Pick something, press
 <kbd>Space</kbd>, and it's installed and loaded. No restart, and after this
 one-time install you don't come back to a terminal for it.
 
@@ -82,13 +89,15 @@ A cdin build consumes this repository through one variable:
 make CDINX_DIR=/path/to/cdin-x      # in the cdin checkout
 ```
 
-which runs `scripts/bundle.py`, writing exactly five things into the build's
+which runs `scripts/bundle.py`, writing exactly six things into the build's
 `data/` directory: each essential plugin, the essential theme, the fonts, a
-one-line shim per plugin, and a `BUNDLE.lua` index. Real copies, no network.
+one-line shim per plugin, a `BUNDLE.lua` index, and whatever support paths the
+plugins declared with `bundle_with`. Real copies, no network.
 
 It fails rather than working around a problem — no essential plugin, not
-exactly one essential theme, a missing or empty `fonts/`, or an output
-directory that is a symlink or junction, which it will not write through.
+exactly one essential theme, a missing or empty `fonts/`, a `bundle_with` path
+that is not there, or an output directory that is a symlink or junction, which
+it will not write through.
 
 It is also idempotent: a second run over the first run's output is
 byte-identical, and no timestamps are preserved. A bundle that differs between
@@ -104,9 +113,11 @@ make bundle DEST=/path/to/cdin/build/<platform>/data
 ## Developing
 
 ```sh
-make validate    # the gate
-make manifest    # regenerate X/manifest.lua
-make list        # print the catalog
+make validate        # the gate
+make manifest        # regenerate X/manifest.lua
+make list            # print the catalog
+make test-panel      # the panel's rows and search
+make test-panel-view # the panel, drawn
 ```
 
 `make validate` is the one that matters. It checks the required files, the
