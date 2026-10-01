@@ -16,6 +16,8 @@ and the destination ends up looking exactly like this:
     <DEST>/X/core/<n>.lua         verbatim copy of each essential
                                   single-file plugin
     <DEST>/plugins/<n>.lua        one-line shim: return require("X.core.<n>")
+    <DEST>/<support>/**           verbatim copy of every `bundle_with` path
+                                  an essential plugin declares
     <DEST>/themes/<t>/theme.lua   the essential theme(s)
     <DEST>/fonts/**               copy of this repository's fonts/
     <DEST>/BUNDLE.lua             return { plugins = {...}, themes = {...} }
@@ -27,11 +29,20 @@ the file a second time under a different module identity. A one-line shim
 that `require`s the real module gives the host the name it wants without
 giving vim a second init.
 
+`bundle_with` is the same problem one level up. An essential plugin may have
+code that does not live under X/: the manager ships as X/core/manager/init.lua
+and its modules are in cdinx/. Declaring `bundle_with = { "cdinx" }` on the
+plugin's manifest copies those paths into the destination with their layout
+intact, so `require "cdinx"` resolves from <DEST>/cdinx/ exactly as it does
+from a checkout. The bundler does not guess at this: an undeclared dependency
+is a build whose editor starts and then does nothing, which is not a failure
+anyone should have to debug at runtime.
+
 Essential is a marker on a plugin, not a file listing: `essential = true` in
 its manifest means "a cdin build without this is not a working editor", which
-is the bundler's entire selection rule. The one essential plugin today is
-vim, and the one essential theme is default. Adding a second essential thing
-is a deliberate act, not an accident of layout.
+is the bundler's entire selection rule. The one essential theme is default.
+Adding a second essential thing is a deliberate act, not an accident of
+layout.
 
 Stdlib only, Python 3.8+, no network, no imports from cdin.
 """
@@ -49,6 +60,13 @@ from pathlib import Path
 # are stripped before this runs, so a plugin that merely mentions
 # "essential = true" in a header comment is not mistaken for one.
 ESSENTIAL_RE = re.compile(r"^\s*essential\s*=\s*true\b", re.MULTILINE)
+
+# `bundle_with = { "cdinx", ... }` — support paths an essential plugin needs
+# beside it in a build. Read as text, not executed, for the same reason
+# `essential` is: a build step that runs plugin code to learn what to copy is
+# a build step with the plugin's side effects.
+BUNDLE_WITH_RE = re.compile(r"bundle_with\s*=\s*\{([^}]*)\}", re.MULTILINE)
+QUOTED_RE = re.compile(r'"([^"]*)"|\'([^\']*)\'')
 
 # Lua comments: --[[ ... ]] blocks, --[==[ ... ]==] blocks, and -- to EOL.
 # A string containing "--" would be mangled by the second pass; none of the
@@ -114,13 +132,47 @@ def is_essential(path: Path) -> bool:
     return ESSENTIAL_RE.search(strip_lua_comments(src)) is not None
 
 
-def manifest_of(plugin_dir: Path) -> Path:
+def manifest_of(plugin_dir: Path):
     """The file that carries a directory plugin's manifest, or None."""
     for name in ("manifest.lua", "init.lua"):
         candidate = plugin_dir / name
         if candidate.is_file():
             return candidate
     return None
+
+
+def bundle_with_of(manifest):
+    """Support paths a plugin declares with `bundle_with = { ... }`.
+
+    Repository-relative, normalized to forward slashes so the destination
+    layout does not depend on which platform ran the bundler. An empty list
+    is the normal answer: only a plugin whose code lives outside X/ has one.
+
+    Read as text, for the same reason `essential` is read as text: a build
+    step that executes a plugin to learn what to copy has run the plugin.
+    """
+    if manifest is None:
+        return []
+    try:
+        src = manifest.read_text(encoding="utf-8", errors="replace")
+    except OSError as exc:
+        die("cannot read {}: {}".format(manifest, exc))
+
+    match = BUNDLE_WITH_RE.search(strip_lua_comments(src))
+    if not match:
+        return []
+
+    paths = []
+    for dquoted, squoted in QUOTED_RE.findall(match.group(1)):
+        name = (dquoted or squoted).strip().replace("\\", "/")
+        # A path that escapes the repository is never a support path, whatever
+        # the manifest says. Refusing loudly beats copying something out of
+        # the tree on the strength of a string in a file nobody re-reads.
+        if not name or name.startswith("/") or ".." in name.split("/"):
+            die("{}: bundle_with has an unusable path: {!r}".format(manifest, name))
+        if name not in paths:
+            paths.append(name)
+    return paths
 
 
 def copy_file(src: Path, dst: Path) -> None:
@@ -207,15 +259,26 @@ def write_index(out: Path, plugins, themes) -> None:
     (out / "BUNDLE.lua").write_text(body, encoding="utf-8", newline="\n")
 
 
-def reset(out: Path) -> None:
+def reset(out: Path, support=()) -> None:
     """Clear only what this script owns, then rebuild it.
 
     Idempotent by construction: a second run over a first run's output
     produces byte-identical files. The other entries in the destination are
     left strictly alone — in particular `core`, which is the host's own
     runtime and is not ours to touch.
+
+    `support` is the top level of every `bundle_with` path. Those are ours
+    too, and they are cleared here for the same reason X/ is: a directory
+    this script copies into and does not clear is how a file deleted from a
+    plugin survives in every build after it.
     """
-    for name in ("X", "plugins", "themes", "fonts"):
+    owned = ["X", "plugins", "themes", "fonts"]
+    for path in support:
+        top = path.replace("\\", "/").split("/")[0]
+        if top and top not in owned:
+            owned.append(top)
+
+    for name in owned:
         target = out / name
         if is_link(target):
             # A link here would make rmtree delete through to whatever it
@@ -266,6 +329,19 @@ def main() -> int:
             "one is not a working editor. Mark the plugin that is "
             "`essential = true` in its manifest.")
 
+    # Support files an essential plugin declares with `bundle_with`. Collected
+    # before anything is written so a bad path stops the build rather than
+    # half-assembling it.
+    support = []
+    for plugin in dirs + singles:
+        for rel in bundle_with_of(manifest_of(plugin) if plugin.is_dir() else plugin):
+            src = root / rel
+            if not src.exists():
+                die("{} declares bundle_with = {{ {} }} but {} is not there"
+                    .format(plugin.name, rel, src))
+            if rel not in support:
+                support.append(rel)
+
     themes = essential_themes(x_root)
     theme_names = [t.name for t in themes]
     if len(theme_names) != 1:
@@ -284,7 +360,7 @@ def main() -> int:
             "will substitute a different set.".format(fonts_src))
 
     out.mkdir(parents=True, exist_ok=True)
-    reset(out)
+    reset(out, support)
 
     # X/** — verbatim, namespace preserved, so that a require of a vim
     # submodule still resolves the same way it does here.
@@ -301,6 +377,16 @@ def main() -> int:
     for theme in themes:
         copy_file(theme / "theme.lua", out / "themes" / theme.name / "theme.lua")
 
+    # <support>/** — verbatim, at the top level, so a plugin's own module
+    # namespace is the same in a build as in a checkout.
+    for rel in support:
+        src = root / rel
+        dst = out / rel
+        if src.is_dir() and not src.is_symlink():
+            copy_tree(src, dst)
+        else:
+            copy_file(src, dst)
+
     # fonts/** — verbatim.
     copy_tree(fonts_src, out / "fonts")
 
@@ -311,6 +397,8 @@ def main() -> int:
                   ", ".join(sorted(theme_names)),
                   sum(1 for _ in (out / "fonts").rglob("*") if _.is_file()),
                   out))
+    if support:
+        print("  with support files: {}".format(", ".join(support)))
     return 0
 
 

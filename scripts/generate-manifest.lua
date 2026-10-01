@@ -10,6 +10,16 @@ local function q(s)
   return string.format("%q", tostring(s or ""))
 end
 
+-- { "a", "b" } -- the dependency lists are written into the index so the
+-- manager knows what an extension needs BEFORE it has downloaded it. Without
+-- them, installing from the catalog fetches the one extension and none of
+-- what it requires, and the result cannot load.
+local function list(t)
+  local out = {}
+  for _, v in ipairs(t or {}) do out[#out + 1] = q(v) end
+  return "{ " .. table.concat(out, ", ") .. " }"
+end
+
 local plugins = {}
 
 for _, entry in ipairs(scan.plugin_entries()) do
@@ -21,6 +31,8 @@ for _, entry in ipairs(scan.plugin_entries()) do
       version = meta.version or "0.0.0",
       description = meta.description or "",
       essential = meta.essential == true,
+      dependencies = meta.dependencies or {},
+      optional_dependencies = meta.optional_dependencies or {},
       files = entry.single_file and { entry.path } or scan.list_files_recursive(entry.base),
     }
   end
@@ -74,6 +86,12 @@ for _, name in ipairs(names) do
   lines[#lines + 1] = "      version = " .. q(meta.version) .. ","
   lines[#lines + 1] = "      description = " .. q(meta.description) .. ","
   lines[#lines + 1] = "      essential = " .. tostring(meta.essential) .. ","
+  if meta.dependencies and #meta.dependencies > 0 then
+    lines[#lines + 1] = "      dependencies = " .. list(meta.dependencies) .. ","
+  end
+  if meta.optional_dependencies and #meta.optional_dependencies > 0 then
+    lines[#lines + 1] = "      optional_dependencies = " .. list(meta.optional_dependencies) .. ","
+  end
   lines[#lines + 1] = "      files = {"
   for _, f in ipairs(meta.files) do
     lines[#lines + 1] = "        " .. q(f) .. ","
