@@ -25,27 +25,32 @@ end
 local base_config = config_home .. sep .. "cdin"
 local base_data   = data_home .. sep .. "cdin"
 
--- The site directory: where an installed cdin-x lives, and where the host's
--- plugin loader looks for site plugins.
---
--- The host owns this value. config.site_path() is the host's own resolver,
--- and it is the single place the directory's *name* is defined — so honouring
--- it here is what makes `config.site_dirname = "extensions"` in a user's
--- init.lua rename the directory for cdin-x as well. Computing a path here
--- instead would give the two halves different answers, and the loader would
--- look where the installer never wrote.
 config.site_dir       = config.site_path()
+
+config.bundle_dir     = config.bundle_dir or config.data_dir
 
 config.user_root      = config.user_root or base_config
 config.user_dir       = config.user_dir or (base_config .. sep .. "user")
-config.extension_dir  = config.extension_dir or (base_data .. sep .. "extensions")
+
+config.legacy_extension_dir = config.extension_dir and nil
+                            or (base_data .. sep .. "extensions")
+config.extension_dir  = config.extension_dir
+                     or (base_data .. sep .. "extensions" .. sep .. "X")
 config.registry_dir   = config.registry_dir or (env("CDIN_X_REGISTRY")
                                         or (base_data .. sep .. "registry" .. sep .. "cdin-x"))
 config.state_file     = config.state_file or (base_data .. sep .. "extensions.lua")
 config.registry_url   = config.registry_url or "https://github.com/m-mdy-m/cdin-x.git"
 
--- config.fonts_dir is deliberately NOT set here. The fonts are part of the
--- mandatory bundle and the host already points at them; an extension that
--- needed a different font would shadow the editor's own text rendering.
+local function raw_url_from(url)
+  local owner, repo = tostring(url):match("github%.com[/:]([^/]+)/([^/]+)")
+  if not owner then return nil end
+  repo = repo:gsub("%.git$", "")
+  return "https://raw.githubusercontent.com/" .. owner .. "/" .. repo
+    .. "/" .. (env("CDIN_X_BRANCH") or "main")
+end
+
+config.registry_raw_url = config.registry_raw_url
+  or raw_url_from(config.registry_url)
+  or "https://raw.githubusercontent.com/m-mdy-m/cdin-x/main"
 
 return config
