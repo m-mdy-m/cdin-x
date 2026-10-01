@@ -19,6 +19,8 @@ local M = {
   category = "integration",
   type = "plugin",
   essential = false,
+  -- Installing vim-git installs all of these with it: the commands need vim's
+  -- shell and git's recipes, and the Git menu section needs menu + vim-menu.
   dependencies = { "vim", "git", "menu", "vim-menu" },
   min_cdin_version = "0.5.0",
   tags = { "vim", "git", "menu", "integration" },
@@ -29,19 +31,38 @@ local MENU_ORDER = 30
 
 local loaded = false
 
+-- The menu section is only added when the "vim.main" menu exists, i.e. when
+-- both `menu` and `vim-menu` are loaded. Returns the menu module or nil.
+local function vim_menu()
+  local ok, menu = pcall(require, "X.core.menu.impl")
+  if not ok or type(menu) ~= "table" then return nil end
+  if not (menu.menus and menu.menus["vim.main"]) then return nil end
+  return menu
+end
+
+local menu_extended = false
+
 function M.init()
   if loaded then return end
   loaded = true
-  local menu = require "X.core.menu.impl"
   require("X.integration.vim.vim-git.commands").register()
-  menu.extend("vim.main", SECTION_ID, function()
-    return require("X.integration.vim.vim-git.menu").section()
-  end, MENU_ORDER)
+
+  local menu = vim_menu()
+  if menu then
+    menu.extend("vim.main", SECTION_ID, function()
+      return require("X.integration.vim.vim-git.menu").section()
+    end, MENU_ORDER)
+    menu_extended = true
+  end
 end
 
 function M.unload()
   if not loaded then return end
-  require("X.core.menu.impl").remove_extension("vim.main", SECTION_ID)
+  if menu_extended then
+    local menu = vim_menu()
+    if menu then menu.remove_extension("vim.main", SECTION_ID) end
+    menu_extended = false
+  end
   require("X.integration.vim.vim-git.commands").unregister()
   loaded = false
 end

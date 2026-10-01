@@ -50,29 +50,4 @@ local function run(cmd)
   return false, "git command failed: " .. cmd
 end
 
--- root is the registry's X/ directory; its parent is the git checkout.
--- `root`/.. must be derived with a separator-safe join because a bare ".."
--- after a trailing separator is a no-op on some platforms.
-local function parent_of(root)
-  return root:sub(1, -2)
-end
-
--- Fetches (clone or pull) the registry into place. Called by core through the
--- syncer hook; returns true on success, or false plus a reason.
-function M.sync_registry(root, url)
-  local git = M.exe()
-  if not git then return false, "git executable not found" end
-
-  local checkout = parent_of(root)
-  if Utils.IS_WIN then checkout = checkout:gsub("/", "\\") end
-
-  if M.popen(git .. ' -C "' .. checkout .. '" rev-parse --git-dir 2>/dev/null') then
-    return run(git .. ' -C "' .. checkout .. '" pull --ff-only')
-  end
-
-  local parent = checkout:match("^(.*)[/\\][^/\\]+[/\\][^/\\]+$") or checkout
-  if Utils.IS_WIN then parent = parent:gsub("/", "\\") end
-  return run(git .. " clone --depth 1 " .. quote(url) .. " " .. quote(checkout))
-end
-
 return M

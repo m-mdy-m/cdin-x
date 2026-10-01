@@ -48,6 +48,9 @@ function M.unload()
   if not loaded then return end
   require("X.core.treeview.keymap").unregister()
   require("X.core.treeview.commands").unregister()
+  -- The pane goes back with the plugin. A treeview that is disabled but still
+  -- owns a column is an empty strip of screen with no key that closes it.
+  require("X.core.treeview.treeview_impl").detach()
   require("core").treeview = nil
   loaded = false
 end

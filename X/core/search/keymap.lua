@@ -7,13 +7,15 @@ local MAP = {
   ["shift+r"]        = "find-replace:previous-find",
   ["ctrl+shift+h"]   = "find-replace:clear-highlight",
   ["f4"]             = "find-replace:repeat-find",
-  -- Ctrl+D is owned by doc:select-word too. A list is a fallback chain, not
-  -- an override: the commands are tried in order and the first one whose
-  -- predicate holds runs. So the search takes it while a match is selected,
-  -- and select-word takes it the rest of the time. The `true` below replaces
-  -- whatever stroke the default keymap already had, which is what we want —
-  -- adding without it would prepend and leave the old chain in front.
-  ["ctrl+d"]         = { "find-replace:select-next", "doc:select-word" },
+  -- Ctrl+D is owned by doc:select-word too. keymap.add() prepends, so the
+  -- search takes it while a match is selected (its predicate holds) and the
+  -- core's doc:select-word, still behind it in the chain, takes it otherwise.
+  --
+  -- Never pass `overwrite` here. It replaces the WHOLE chain for a stroke,
+  -- and up / down / return below are also the document cursor, the command
+  -- line's submit and the autocomplete popup: overwriting them left the
+  -- document with dead arrows and the ":" prompt with a dead Enter.
+  ["ctrl+d"]         = "find-replace:select-next",
 
   ["f5"]           = "project-search:refresh",
   ["ctrl+shift+f"] = "project-search:find",
@@ -23,7 +25,7 @@ local MAP = {
 }
 
 function M.register()
-  keymap.add(MAP, true)
+  keymap.add(MAP)
 end
 
 function M.unregister()

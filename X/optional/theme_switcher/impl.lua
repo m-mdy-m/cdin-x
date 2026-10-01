@@ -51,7 +51,7 @@ local KEYS = { ["ctrl+alt+t"] = "core:change-theme" }
 
 function M.register()
   command.add(nil, MAP, true)
-  keymap.add(KEYS, true)
+  keymap.add(KEYS)
 end
 
 function M.unregister()

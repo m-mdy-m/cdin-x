@@ -49,7 +49,7 @@ local KEYS = { ["ctrl+alt+u"] = "unicode:inspect" }
 
 function M.register()
   command.add("core.views.docview", MAP, true)
-  keymap.add(KEYS, true)
+  keymap.add(KEYS)
 end
 
 function M.unregister()

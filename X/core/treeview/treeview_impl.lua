@@ -237,8 +237,35 @@ end
 
 local view = TreeView()
 API.set_view(view)
-local node = core.root_view:get_active_node()
-node:split("left", view, true)
+
+-- The tree claims an EDGE of the layout, not the pane that happens to hold
+-- focus.
+--
+-- Splitting `get_active_node()` is what put the tree on the wrong side. That
+-- node is "whatever the user last clicked", and another side panel — the
+-- extension panel — had already split it, so the tree landed between the
+-- document and that panel. Which side it ended up on depended on load order
+-- and on where you had last clicked, and neither is knowable from the screen.
+--
+-- `attach_side_view` is idempotent and does not steal focus, so calling it
+-- from init() on every enable cycle is safe. `config.treeview_side` is the one
+-- knob; it defaults to the right, and a build that wants it on the left sets
+-- that in its user init.lua.
+if config.treeview_side == nil then
+  config.treeview_side = "right"
+end
+if config.treeview_side ~= "left" and config.treeview_side ~= "right" then
+  config.treeview_side = "right"
+end
+
+core.root_view:attach_side_view(view, config.treeview_side, { locked = true })
+
+-- Called by the plugin's unload(). Giving the column back is the point: a
+-- disabled treeview that left its pane behind is an empty strip of screen with
+-- no key that closes it.
+function M.detach()
+  core.root_view:detach_view(view)
+end
 
 Doc._after_save[#Doc._after_save + 1] = Ops.request_project_rescan
 

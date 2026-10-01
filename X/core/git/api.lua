@@ -34,10 +34,6 @@ M.status   = status
 -- to hand to X.core.vim.shell.run_in_buffer().
 M.recipes  = recipes
 
--- Fetching the extension registry (clone/pull) is a git operation, so it
--- lives here rather than in core. See M.sync_registry in manager/ops.lua.
-M.sync_registry = Ops.sync_registry
-
 -- ── core integration point ──────────────────────────────────────────────
 -- core is runtime-only, so it knows nothing about git. It exposes
 -- tiny generic hooks instead (see core.register_vcs_provider in
@@ -48,10 +44,9 @@ M.sync_registry = Ops.sync_registry
 --   status                   -> table the status bar reads for the
 --                               branch / ahead / behind / dirty pill
 --
--- The second hook is the registry syncer: core/manager/registry.lua will
--- pull or clone the cdin-x catalog, but it refuses to know that git exists.
--- If this extension is not loaded, refreshing the catalog reports that it is
--- unavailable instead of silently doing nothing.
+-- The extension catalog is NOT fetched with git: cdinx downloads
+-- X/manifest.lua and the files of the one extension being installed over
+-- HTTPS (see cdinx/manager/fetch.lua). Nothing here clones cdin-x.
 local registered = false
 
 function M.register()
@@ -63,11 +58,6 @@ function M.register()
       refresh_ignored_now = status.refresh_ignored_now,
       status              = status,
     })
-  end
-
-  local manager = require "cdinx.manager"
-  if manager.set_registry_syncer then
-    manager.set_registry_syncer(Ops.sync_registry)
   end
 
   registered = true

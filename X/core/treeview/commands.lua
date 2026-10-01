@@ -42,6 +42,17 @@ end
 local GLOBAL = {
   ["treeview:toggle"] = function()
     M.view.visible = not M.view.visible
+    if not M.view.visible and core.active_view == M.view then
+      local back = core.last_active_view
+      if back and back ~= M.view and core.root_view.root_node:get_node_for_view(back) then
+        core.set_active_view(back)
+      else
+        local doc = core.active_docview()
+        if doc then core.set_active_view(doc) end
+      end
+    elseif M.view.visible then
+      command.perform("treeview:focus-and-refresh")
+    end
   end,
 
   ["treeview:focus"] = function()
@@ -150,7 +161,7 @@ local GLOBAL = {
 
 -- Only offered while the tree itself has focus.
 local function when_focused()
-  return core.active_view == M.view
+  return core.active_view == M.view and M.view.visible
 end
 
 local FOCUSED = {

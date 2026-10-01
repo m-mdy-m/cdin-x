@@ -15,6 +15,7 @@ return {
     "cdinx/init.lua",
     "cdinx/manager/catalog.lua",
     "cdinx/manager/deps.lua",
+    "cdinx/manager/fetch.lua",
     "cdinx/manager/init.lua",
     "cdinx/manager/lifecycle.lua",
     "cdinx/manager/registry.lua",
@@ -22,7 +23,12 @@ return {
     "cdinx/manager/state.lua",
     "cdinx/manager/util.lua",
     "cdinx/manifest.lua",
-    "cdinx/panel.lua",
+    "cdinx/panel/commands.lua",
+    "cdinx/panel/init.lua",
+    "cdinx/panel/keymap.lua",
+    "cdinx/panel/rows.lua",
+    "cdinx/panel/search.lua",
+    "cdinx/panel/view.lua",
   },
   plugins = {
     ["autocomplete"] = {
@@ -143,6 +149,7 @@ return {
       version = "0.2.0",
       description = "Git status badges and refresh integration for Treeview",
       essential = false,
+      dependencies = { "git", "treeview" },
       files = {
         "X/integration/git-treeview/init.lua",
       },
@@ -185,6 +192,17 @@ return {
       essential = false,
       files = {
         "X/syntax/lua.lua",
+      },
+    },
+    ["manager"] = {
+      category = "core",
+      type = "plugin",
+      version = "0.2.0",
+      description = "Browse, search, install and remove extensions from inside the editor",
+      essential = true,
+      files = {
+        "X/core/manager/README.md",
+        "X/core/manager/init.lua",
       },
     },
     ["markdown"] = {
@@ -311,6 +329,7 @@ return {
       version = "0.1.0",
       description = "Persist the theme chosen with the theme switcher into the session",
       essential = false,
+      dependencies = { "session", "theme_switcher" },
       files = {
         "X/integration/session/theme-switcher/init.lua",
       },
@@ -358,6 +377,7 @@ return {
       version = "0.2.0",
       description = "Persist open tabs and restore them on the next run",
       essential = false,
+      dependencies = { "tab", "session" },
       files = {
         "X/integration/tab-session/init.lua",
         "X/integration/tab-session/session.lua",
@@ -474,6 +494,7 @@ return {
       version = "0.2.0",
       description = "Git commands and Git menu entries for Vim mode",
       essential = false,
+      dependencies = { "vim", "git", "menu", "vim-menu" },
       files = {
         "X/integration/vim/vim-git/commands.lua",
         "X/integration/vim/vim-git/init.lua",
@@ -486,6 +507,7 @@ return {
       version = "0.2.0",
       description = "Vim file, shell and build menu built on the generic menu core",
       essential = false,
+      dependencies = { "vim", "menu" },
       files = {
         "X/integration/vim/vim-menu/commands.lua",
         "X/integration/vim/vim-menu/files.lua",
@@ -500,6 +522,7 @@ return {
       version = "0.2.0",
       description = "Vim bindings for the CDIN-X extension manager",
       essential = false,
+      dependencies = { "vim", "menu", "vim-menu" },
       files = {
         "X/integration/vim/vim-plugin-manager/init.lua",
         "X/integration/vim/vim-plugin-manager/keymap.lua",
@@ -511,6 +534,7 @@ return {
       version = "0.2.0",
       description = "Search and project-search bindings for Vim mode",
       essential = false,
+      dependencies = { "vim", "search", "menu", "vim-menu" },
       files = {
         "X/integration/vim/vim-search/init.lua",
         "X/integration/vim/vim-search/keymap.lua",
@@ -522,6 +546,7 @@ return {
       version = "0.2.0",
       description = "Vim tab commands backed by the CDIN tab plugin",
       essential = false,
+      dependencies = { "vim", "tab" },
       files = {
         "X/integration/vim/vim-tab/commands.lua",
         "X/integration/vim/vim-tab/init.lua",
@@ -534,6 +559,7 @@ return {
       version = "0.2.0",
       description = "Treeview navigation and context integration for Vim",
       essential = false,
+      dependencies = { "vim", "treeview", "menu", "vim-menu" },
       files = {
         "X/integration/vim/vim-treeview/commands.lua",
         "X/integration/vim/vim-treeview/init.lua",
@@ -545,6 +571,7 @@ return {
       version = "0.2.0",
       description = "Vim window commands backed by the CDIN window plugin",
       essential = false,
+      dependencies = { "vim", "window" },
       files = {
         "X/integration/vim/vim-window/commands.lua",
         "X/integration/vim/vim-window/init.lua",

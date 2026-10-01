@@ -6,7 +6,7 @@ local M = {}
 local MAP = { ["ctrl+shift+u"] = "autoupdate:check" }
 
 function M.register()
-  keymap.add(MAP, true)
+  keymap.add(MAP)
 end
 
 function M.unregister()

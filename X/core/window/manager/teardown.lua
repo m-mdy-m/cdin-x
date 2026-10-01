@@ -5,7 +5,33 @@ local C    = require "X.core.window.manager.context"
 local M = {}
 
 -- Drop the active view from its leaf without asking about unsaved
--- changes. 
+-- changes.
+
+-- Clear `core.last_active_view`, but only when it still names a view that is
+-- actually in the tree.
+--
+-- `core.set_active_view` asserts on nil, and three callers hand it exactly
+-- that: `CommandView:exit`, `StatusView:exit` and `TitleBar:on_mouse_pressed`
+-- all do `core.set_active_view(core.last_active_view)`. Blanking the field
+-- unconditionally therefore arms a landmine for whatever opens a prompt next.
+--
+-- That is not hypothetical. `:qa!` runs `close_all_views`, which blanked the
+-- field, and `CommandView:submit` had *already* called `exit(true)` -- so
+-- `core.quit` was never reached, the prompt stayed open, and
+-- `CommandView:update` then called `exit` again on every single frame:
+-- an assert raised inside the frame loop forever. The editor froze with Enter
+-- dead and no error on screen, because `core.try` swallowed the raise on the
+-- keystroke and let the frame loop keep going.
+--
+-- The rule is therefore: a stale pointer is the one thing this may not leave
+-- behind. Anything still in the tree is left alone.
+local function forget_last_active(root)
+  local last = core.last_active_view
+  if last == nil then return end
+  if root:get_node_for_view(last) then return end
+  core.last_active_view = nil
+end
+
 function M.close_active_view()
   local root = C.root()
   local node = core.root_view:get_active_node()
@@ -32,7 +58,7 @@ function M.close_active_view()
     end
   end
 
-  core.last_active_view = nil
+  forget_last_active(root)
   root:update_layout()
   core.redraw = true
   return true
@@ -90,7 +116,7 @@ function M.close_all_views()
     end
   end
 
-  core.last_active_view = nil
+  forget_last_active(root)
   core.redraw = true
   return true
 end

@@ -36,7 +36,7 @@ local KEYS = {
 
 function M.register()
   command.add(nil, MAP, true)
-  keymap.add(KEYS, true)
+  keymap.add(KEYS)
 end
 
 function M.unregister()
