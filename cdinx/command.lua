@@ -15,7 +15,9 @@ local CATEGORY_ORDER = {
 }
 
 local function status(plugin)
-  if plugin._source == "builtin" then return "[L]" end
+  if Manager.is_locked(plugin.name) then
+    return plugin._source == "provided" and "[H]" or "[L]"
+  end
   local s = Manager.get_status(plugin.name)
   if s == "installed" then return "[X]" end
   if s == "disabled" then return "[-]" end
@@ -51,7 +53,7 @@ local function catalog_items(include_builtins)
   local plugins=Manager.list()
   local by_category, seen_category = {}, {}
   for _, plugin in pairs(plugins) do
-    if include_builtins or plugin._source ~= "builtin" then
+    if include_builtins or not Manager.is_locked(plugin.name) then
       local cat=plugin.category or "other"
       by_category[cat] = by_category[cat] or {}
       by_category[cat][#by_category[cat]+1] = plugin
@@ -96,6 +98,8 @@ function Command.show_menu()
     {text="Update All",info="Re-fetch installed extensions whose registry version changed",action=Command.show_update_all},
     {text="Clean",info="Remove installed extensions no longer in the registry",action=Command.show_clean},
     {text="Refresh Catalog",info="Update the cdin-x catalog",action=Command.show_refresh},
+    {text="Editor Log",info="Messages and errors from the editor and its extensions",
+      action=function() command.perform("core:open-log") end},
   }
   open_items("CDIN-X",items,function(text,item)
     if item and item.action then item.action() end
@@ -107,7 +111,7 @@ function Command.show_catalog()
   open_items("Extensions",items,function(text,item)
     if not item or not item._plugin then return end
     local plugin=item._plugin
-    if plugin._source=="builtin" then
+    if Manager.is_locked(plugin.name) then
       Command.show_details(plugin.name)
       return
     end
@@ -135,9 +139,9 @@ function Command.show_details(name)
     end},
   }
 
-  if plugin._source=="builtin" or plugin.essential then
-    items[#items+1]={text="Locked",info="Built into CDIN and cannot be removed",action=function()
-      core.log("%s is a built-in extension",name)
+  if Manager.is_locked(name) or plugin.essential then
+    items[#items+1]={text="Locked",info="Part of the editor, and cannot be removed",action=function()
+      core.log("%s is built into the editor",name)
     end}
   elseif installed or disabled then
     items[#items+1]={text=disabled and "Enable" or "Disable",

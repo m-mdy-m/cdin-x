@@ -28,7 +28,7 @@ function cdin_x.bootstrap()
   local Command = require "cdinx.command"
   Command.register()
 
-  require "cdinx.panel"
+  require("cdinx.panel").register()
 
   core.cdinx = cdin_x
   core.log("cdin-x bootstrapped")
