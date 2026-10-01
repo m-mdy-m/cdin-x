@@ -8,6 +8,7 @@ local Registry  = require "cdinx.manager.registry"
 local State     = require "cdinx.manager.state"
 local Catalog   = require "cdinx.manager.catalog"
 local Runtime   = require "cdinx.manager.runtime"
+local Fetch     = require "cdinx.manager.fetch"
 local Lifecycle = require "cdinx.manager.lifecycle"
 
 local Manager = {
@@ -35,33 +36,35 @@ local bootstrapped = false
 local function user_extensions_root()
   return config.extension_dir
 end
-local function builtin_root()
-  return Util.join(config.site_dir, "X")
+
+local function builtin_roots()
+  local roots = {}
+  if config.bundle_dir then
+    roots[#roots + 1] = Util.join(config.bundle_dir, "X")
+  end
+  roots[#roots + 1] = Util.join(config.site_dir, "X")
+  return roots
 end
 
 local function current_roots()
   return {
     registry  = Registry.registry_root(config),
     installed = user_extensions_root(),
-    builtin   = builtin_root(),
+    builtin   = builtin_roots(),
   }
 end
 
 local function merge_sources()
   local all = Catalog.merge_sources(ctx, current_roots())
-  -- A plugin the host already loaded is not a plugin the manager offers:
-  -- it is already running, so listing it as installable would invite the
-  -- user to "install" something that is present, and loading it would be
-  -- the double-init described on collect_provided. Deps still resolves it
-  -- as a satisfied dependency, so integrations that need vim keep working.
-  for name in pairs(ctx.provided or {}) do
-    all[name] = nil
-    ctx.sources[name] = "provided"
-  end
+  Catalog.add_provided(ctx, ctx.provided)
   Manager.available = all
   Manager.sources = ctx.sources
   return all
 end
+
+-- Lets Lifecycle refresh the catalog view after it put files on disk, without
+-- reaching back into this module.
+ctx.rescan = function() merge_sources() end
 
 local function save_state()
   return State.save(config, ctx.state)
@@ -92,8 +95,8 @@ function Manager.set_registry_syncer(fn)
 end
 
 function Manager.refresh_registry()
-  local ok, err = Registry.ensure(config, ctx)
-  if not ok then return false, err end
+  -- No Registry.ensure() here: "the catalog is not on disk yet" is exactly the
+  -- case a refresh exists to fix.
   local refreshed, refresh_err = Registry.refresh(config)
   if not refreshed then return false, refresh_err end
   merge_sources()
@@ -110,6 +113,21 @@ local function collect_provided()
       provided[name] = true
     end
   end
+
+  local dir = config.bundle_dir and Util.join(config.bundle_dir, "plugins")
+  for _, entry in ipairs(dir and fs.list(dir) or {}) do
+    if entry.type == "file" then
+      local name = entry.name:match("^(.+)%.lua$")
+      if name then
+        provided[name] = true
+      end
+    elseif entry.type == "dir" then
+      if fs.is_file(Util.join(dir, entry.name, "init.lua")) then
+        provided[entry.name] = true
+      end
+    end
+  end
+
   ctx.provided = provided
   return provided
 end
@@ -118,6 +136,10 @@ end
 
 function Manager.bootstrap()
   if bootstrapped then return true end
+
+  -- Before anything is loaded: an installed extension's first require of its
+  -- own modules has to find them in the extension store.
+  require("cdinx.manager.loader").ensure(config.extension_dir)
 
   ctx.state = State.load(config)
   collect_provided()
@@ -134,6 +156,66 @@ function Manager.bootstrap()
 end
 
 -- ── catalog / listing ──────────────────────────────────────────────────
+
+-- Which of the roots that hold installable extensions actually exist.
+--
+-- Named `roots`, not `sources`: Manager.sources is the name -> origin table
+-- that merge_sources() keeps replacing, and a function by that name was
+-- overwritten on the first scan.
+function Manager.roots()
+  local roots = current_roots()
+  local builtin = 0
+  for _, root in ipairs(roots.builtin or {}) do
+    if fs.is_dir(root) then builtin = builtin + 1 end
+  end
+  return {
+    registry     = fs.is_file(Util.join(roots.registry, "manifest.lua")),
+    installed    = fs.is_dir(roots.installed),
+    builtin      = builtin,
+    registry_dir = config.registry_dir,
+  }
+end
+
+-- ── fetching the catalog ───────────────────────────────────────────────
+
+local catalog = { status = "idle", message = nil }
+
+-- "idle" (never tried), "fetching", "ready" or "failed", plus the reason.
+function Manager.catalog_state()
+  return catalog.status, catalog.message
+end
+
+-- Downloads the catalog index (one file) without blocking the editor. Returns true when
+-- a fetch is running (or already was), false plus a reason when it could not
+-- start. `on_done(ok, err)` runs once, from a thread, when it ends.
+function Manager.fetch_catalog(on_done)
+  if catalog.status == "fetching" then return true end
+
+  local job, err = Fetch.start(config.registry_dir, config.registry_raw_url)
+  if not job then
+    catalog.status, catalog.message = "failed", err
+    return false, err
+  end
+
+  catalog.status, catalog.message = "fetching", nil
+  core.add_thread(function()
+    while true do
+      local ok, perr = Fetch.poll(job)
+      if ok ~= nil then
+        if ok then
+          catalog.status, catalog.message = "ready", nil
+          merge_sources()
+        else
+          catalog.status, catalog.message = "failed", perr
+        end
+        if on_done then on_done(ok, perr) end
+        return
+      end
+      coroutine.yield(0.25)
+    end
+  end)
+  return true
+end
 
 function Manager.scan()
   return merge_sources()
@@ -170,12 +252,19 @@ end
 function Manager.get_status(name)
   local plugin = Manager.available[name]
   if not plugin then return "missing" end
+  if plugin._source == "provided" then return "provided" end
   if plugin._source == "builtin" then return "builtin" end
   if plugin._source == "installed" then
     if is_disabled(name) then return "disabled" end
     return "installed"
   end
   return "available"
+end
+
+function Manager.is_locked(name)
+  local plugin = Manager.available[name]
+  if not plugin then return false end
+  return plugin._source == "builtin" or plugin._source == "provided"
 end
 
 function Manager.get_readme(name)

@@ -3,6 +3,7 @@ local Manifest = require "cdinx.manifest"
 local Util     = require "cdinx.manager.util"
 local Catalog  = require "cdinx.manager.catalog"
 local Runtime  = require "cdinx.manager.runtime"
+local Fetch    = require "cdinx.manager.fetch"
 
 local Lifecycle = {}
 
@@ -23,6 +24,59 @@ local function is_disabled(ctx, name)
   return ctx.state.disabled[name] == true
 end
 
+local function place(src, dst)
+  Fetch.mkdir_p(fs.dirname(dst))
+  if fs.exists(dst) then fs.rm(dst) end
+
+  local moved = fs.move and fs.move(src, dst)
+  if not moved or not fs.exists(dst) then
+    local ok, err = fs.copy(src, dst)
+    if not ok then return false, err or ("could not copy to " .. dst) end
+  end
+  if not fs.exists(dst) then
+    return false, "nothing was written to " .. dst
+  end
+  return true
+end
+
+local function fetch_entry(config, plugin)
+  local rel = plugin._relpath
+  if not rel then
+    return false, "the catalog index has no file list for " .. tostring(plugin.name)
+  end
+  local staged, err = Fetch.download(config.registry_dir, config.registry_raw_url,
+    plugin.name, plugin.files)
+  if not staged then return false, err end
+
+  local src = Util.join(staged, (rel:gsub("/", PATHSEP or "/")))
+  if plugin._single_file then src = src .. ".lua" end
+  if not fs.exists(src) then
+    Fetch.discard(staged)
+    return false, "the download of " .. tostring(plugin.name) .. " was incomplete"
+  end
+  return src, staged
+end
+
+local function declared_deps(plugin, src)
+  if plugin.type == "theme" or not src then return {} end
+  local meta
+  if plugin._single_file then
+    local ok, m = pcall(dofile, src)
+    if ok and type(m) == "table" then meta = m end
+  else
+    meta = Manifest.load(src)
+  end
+  return type(meta) == "table" and meta.dependencies or {}
+end
+
+-- Whether the catalog entry already listed `dep` (and so it was handled).
+local function listed_dep(plugin, dep)
+  for _, d in ipairs(plugin.dependencies or {}) do
+    if d == dep then return true end
+  end
+  return false
+end
+
 function Lifecycle.install(ctx, config, name, ensure_registry, save_state, stack)
   local plugin = ctx.available[name]
   if not plugin then
@@ -35,30 +89,65 @@ function Lifecycle.install(ctx, config, name, ensure_registry, save_state, stack
   if plugin._source == "builtin" then
     return true, "already built-in"
   end
+  if plugin._source == "provided" then
+    return true, "provided by the editor"
+  end
+  stack = stack or {}
+  if stack[name] then return false, "dependency cycle: " .. name end
+
+  stack[name] = true
+  for _, dep in ipairs(plugin.dependencies or {}) do
+    local dep_plugin = ctx.available[dep]
+    local needs_fetch = dep_plugin
+      and dep_plugin._source ~= "builtin"
+      and dep_plugin._source ~= "provided"
+      and dep_plugin._source ~= "installed"
+    local ok, err = Lifecycle.install(ctx, config, dep, ensure_registry, save_state, stack)
+    if not ok then
+      stack[name] = nil
+      return false, "dependency " .. dep .. ": " .. tostring(err)
+    end
+    if needs_fetch then
+      require("core").log("cdin-x: installed %s (required by %s)", dep, name)
+    end
+  end
+  stack[name] = nil
+
   if plugin._source == "installed" then
     if plugin.type ~= "theme" and not ctx.installed[name] and not is_disabled(ctx, name) then
+      -- Dependencies may have just been put on disk; make the manager see
+      -- them before it tries to load against them.
+      if ctx.rescan then ctx.rescan() end
       Runtime.load_plugin(ctx, name)
     end
     return true
   end
 
-  stack = stack or {}
-  if stack[name] then return false, "dependency cycle: " .. name end
+  local src, staged = plugin._path, nil
+  if plugin._listed and not plugin._materialised then
+    src, staged = fetch_entry(config, plugin)
+    if not src then return false, staged end
+  end
+
   stack[name] = true
-  for _, dep in ipairs(plugin.dependencies or {}) do
-    local ok, err = Lifecycle.install(ctx, config, dep, ensure_registry, save_state, stack)
-    if not ok then return false, "dependency " .. dep .. ": " .. tostring(err) end
+  for _, dep in ipairs(declared_deps(plugin, src)) do
+    -- A plugin the host already runs (vim, say) needs nothing from us.
+    local host_has = ctx.provided ~= nil and ctx.provided[dep] == true
+    if not host_has and not listed_dep(plugin, dep) then
+      local ok, err = Lifecycle.install(ctx, config, dep, ensure_registry, save_state, stack)
+      if not ok then
+        stack[name] = nil
+        Fetch.discard(staged)
+        return false, "dependency " .. dep .. ": " .. tostring(err)
+      end
+      require("core").log("cdin-x: installed %s (required by %s)", dep, name)
+    end
   end
   stack[name] = nil
 
-  local src = plugin._path
   local dst = install_path_for(config, plugin)
-  fs.mkdir(fs.dirname(dst))
-
-  if fs.exists(dst) then
-    fs.rm(dst)
-  end
-  local ok, err = fs.copy(src, dst)
+  local ok, err = place(src, dst)
+  Fetch.discard(staged)
   if not ok then return false, err end
 
   ctx.state.disabled[name] = nil
@@ -104,7 +193,7 @@ function Lifecycle.install_local(ctx, config, path, install_fn, save_state)
   end
 
   local dst = install_path_for(config, meta)
-  fs.mkdir(fs.dirname(dst))
+  Fetch.mkdir_p(fs.dirname(dst))
   if fs.exists(dst) then fs.rm(dst) end
   local copied, copy_err = fs.copy(path, dst)
   if not copied then return false, copy_err end
@@ -131,24 +220,29 @@ function Lifecycle.update(ctx, config, name, registry_root)
   end
 
   local updated, errors = {}, {}
+  local index = Catalog.scan_index(registry_root, "registry")
   for _, n in ipairs(names) do
     local installed_plugin = ctx.available[n]
     if not installed_plugin or installed_plugin._source ~= "installed" then
       errors[#errors + 1] = n .. ": not installed"
     else
       local locked = ctx.state.lock[n]
-      local registry_plugin = Catalog.scan_root(registry_root, "registry")[n]
+      local registry_plugin = index[n]
       if not registry_plugin then
         -- Not in the registry (e.g. installed via install_local) — nothing to compare against.
       elseif locked and locked.version == (registry_plugin.version or "") then
         -- Already at the latest known version; nothing to do.
       else
-        local src = registry_plugin._path
+        -- Download first: if it fails, the installed copy is untouched.
+        local src, staged = fetch_entry(config, registry_plugin)
+        if not src then
+          errors[#errors + 1] = n .. ": " .. tostring(staged)
+        else
         local dst = install_path_for(config, installed_plugin)
         local was_loaded = ctx.installed[n] ~= nil
         if was_loaded then Runtime.unload_plugin(ctx, n) end
-        fs.rm(dst)
-        local copied, copy_err = fs.copy(src, dst)
+        local copied, copy_err = place(src, dst)
+        Fetch.discard(staged)
         if not copied then
           errors[#errors + 1] = n .. ": " .. tostring(copy_err)
         else
@@ -160,6 +254,7 @@ function Lifecycle.update(ctx, config, name, registry_root)
           if was_loaded and not is_disabled(ctx, n) then
             Runtime.load_plugin(ctx, n)
           end
+        end
         end
       end
     end
@@ -175,15 +270,21 @@ function Lifecycle.clean(ctx, user_extensions_root, registry_root, dry_run)
       for _, dep in ipairs(plugin.dependencies or {}) do
         depended_on[dep] = true
       end
+      for _, dep in ipairs(plugin.optional_dependencies or {}) do
+        depended_on[dep] = true
+      end
     end
   end
 
   local on_disk = Catalog.scan_root(user_extensions_root, "installed")
 
+  local index = Catalog.scan_index(registry_root, "registry")
+  local have_index = next(index) ~= nil
+
   local orphaned = {}
   for name, plugin in pairs(on_disk) do
-    if not plugin.essential and not depended_on[name] then
-      local still_in_registry = Catalog.scan_root(registry_root, "registry")[name] ~= nil
+    if have_index and not plugin.essential and not depended_on[name] then
+      local still_in_registry = index[name] ~= nil
       if not still_in_registry then
         orphaned[#orphaned + 1] = name
       end

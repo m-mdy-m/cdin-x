@@ -3,6 +3,7 @@ local fs     = require "core.fs"
 local config = require "cdinx.config"
 local Util   = require "cdinx.manager.util"
 local Deps   = require "cdinx.manager.deps"
+local Loader = require "cdinx.manager.loader"
 
 local Runtime = {}
 
@@ -11,6 +12,10 @@ local function is_runtime_plugin(plugin)
 end
 
 function Runtime.load_plugin(ctx, name)
+  -- Installed extensions require "X.…" modules that live in the extension
+  -- store without the X/ prefix; see manager/loader.lua. Idempotent.
+  Loader.ensure(config.extension_dir)
+
   -- The host already initialised this one. Loading it again would run its
   -- registrations a second time; see collect_provided in manager/init.lua.
   if Deps.is_provided(ctx, name) then return true end
@@ -21,9 +26,23 @@ function Runtime.load_plugin(ctx, name)
   if ctx.installed[name] then return true end
 
   for _, dep in ipairs(plugin.dependencies or {}) do
-    if not ctx.installed[dep] then
+    if not ctx.installed[dep] and not Deps.is_provided(ctx, dep) then
+      -- A dependency that is only *listed* in the catalog has no files to
+      -- load; say so instead of failing later with "missing init.lua".
+      if not Deps.is_usable(ctx, dep) then
+        return false, "dependency '" .. dep .. "' is not installed"
+      end
       local ok, err = Runtime.load_plugin(ctx, dep)
-      if not ok then return false, err end
+      if not ok then return false, "dependency '" .. dep .. "': " .. tostring(err) end
+    end
+  end
+
+  -- Optional dependencies: load them first if they are there, carry on
+  -- without them if they are not.
+  for _, dep in ipairs(plugin.optional_dependencies or {}) do
+    if not ctx.installed[dep] and not Deps.is_provided(ctx, dep)
+    and Deps.is_usable(ctx, dep) and not ctx.state.disabled[dep] then
+      Runtime.load_plugin(ctx, dep)
     end
   end
 
@@ -88,10 +107,20 @@ function Runtime.load_all(ctx, is_disabled)
     end
   end
 
-  local ordered, err = Deps.topological_order(ctx, targets)
-  if not ordered then
-    core.log("cdin-x: load order error: %s", err)
-    return false
+  local ordered, skipped = Deps.topological_order(ctx, targets)
+
+  -- Unmet dependencies are a per-plugin problem, never a reason to abort the
+  -- manager: report each one, load everything else.
+  local skipped_names = {}
+  for name in pairs(skipped) do skipped_names[#skipped_names + 1] = name end
+  table.sort(skipped_names)
+  for _, name in ipairs(skipped_names) do
+    local info = skipped[name]
+    core.log("cdin-x: %s was not loaded: %s", name, info.reason)
+    if #info.missing > 0 then
+      core.log("cdin-x:   fix: install %s (Extensions panel, or re-install %s)",
+        table.concat(info.missing, ", "), name)
+    end
   end
 
   for _, name in ipairs(ordered) do
