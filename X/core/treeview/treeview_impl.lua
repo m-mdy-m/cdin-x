@@ -260,10 +260,7 @@ end
 
 core.root_view:attach_side_view(view, config.treeview_side, { locked = true })
 
--- Called by the plugin's unload(). Giving the column back is the point: a
--- disabled treeview that left its pane behind is an empty strip of screen with
--- no key that closes it.
-function M.detach()
+function view.detach()
   core.root_view:detach_view(view)
 end
 
