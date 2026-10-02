@@ -1,53 +1,76 @@
-# cdin-x project config
-# Used by gix for git-flow management
-
+# cdin-x project config — see `gix config list` or docs/FLAGS.md
 gix:
   version: "1"
-  remote: origin
-  branch:
-    main:
-      name: main
-      type: base
-      delete_on_finish: false
-    develop:
-      name: develop
-      type: base
-      parent: main
-      autosync: true
-      delete_on_finish: false
-    feature:
-      type: topic
-      prefix: feature/
-      parent: develop
-      upstream_strategy: merge
-      downstream_strategy: merge
-      delete_on_finish: true
-    bugfix:
-      type: topic
-      prefix: bugfix/
-      parent: develop
-      upstream_strategy: merge
-      downstream_strategy: merge
-      delete_on_finish: true
-    release:
-      type: topic
-      prefix: release/
-      parent: develop
-      merge_into:
-        - main
-        - develop
-      upstream_strategy: merge
-      downstream_strategy: merge
-      tag: true
-      delete_on_finish: true
-    hotfix:
-      type: topic
-      prefix: hotfix/
-      parent: main
-      merge_into:
-        - main
-        - develop
-      upstream_strategy: merge
-      downstream_strategy: merge
-      tag: true
-      delete_on_finish: true
+remote: origin
+#
+# NOTE ON `parent:`
+#
+# Every topic branch below is parented to `main`, not to `develop`, and that is
+# a deliberate departure from the git-flow default this file was generated with.
+# It mirrors what m-mdy-m/cdin already does, for the same reason.
+#
+# `develop` is five days stale (last commit 2026-09-26 against main's 2026-10-01)
+# and has diverged: it is 77 commits behind main and 21 ahead, so branching from
+# it produces a tree with none of the panel work in it — no `cdinx/panel/`, no
+# `X/core/manager/`, and not the commit that introduced
+# `RootView:attach_side_view`, which is the thing the treeview fix is about.
+#
+# So `develop` is kept below as a base but nothing parents to it. If it is ever
+# brought up to date, the four `parent:` lines here are the only thing that needs
+# to change back.
+#
+# NOTE ON INDENTATION
+#
+# `remote` and `branch` are read at the TOP level. Indenting them under `gix:`
+# is valid YAML and still parses as one, which is why it went unnoticed — but
+# gix looks for `branch` at the root and found nothing, and every command
+# (`status`, `list`, `config list`, `bugfix start`) failed with
+# "no branches defined". A config that cannot be read is a config that cannot
+# create a branch, so this is not cosmetic.
+branch:
+  bugfix:
+    type: topic
+    prefix: bugfix/
+    parent: main
+    upstream_strategy: merge
+    downstream_strategy: merge
+    delete_on_finish: true
+  develop:
+    name: develop
+    type: base
+    parent: main
+    autosync: false
+    delete_on_finish: false
+  feature:
+    type: topic
+    prefix: feature/
+    parent: main
+    upstream_strategy: merge
+    downstream_strategy: merge
+    delete_on_finish: true
+  hotfix:
+    type: topic
+    prefix: hotfix/
+    parent: main
+    merge_into:
+    - main
+    - develop
+    upstream_strategy: merge
+    downstream_strategy: merge
+    tag: true
+    delete_on_finish: true
+  main:
+    name: main
+    type: base
+    delete_on_finish: false
+  release:
+    type: topic
+    prefix: release/
+    parent: main
+    merge_into:
+    - main
+    - develop
+    upstream_strategy: merge
+    downstream_strategy: merge
+    tag: true
+    delete_on_finish: true
