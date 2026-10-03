@@ -7,11 +7,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [0.2.0] — unreleased
+## [Unreleased]
 
-21 commits since `v0.1.0`. Two themes: **the manager stopped being a thing you
-run from outside the editor and became one you run from inside it**, and **vim
-mode stopped being a table of key names**.
+## [0.2.0] — 2026-10-03
 
 `manager` is now a plugin in the catalog and `essential = true`, so every cdin
 build carries an extension panel. The catalog is downloaded over plain HTTPS —
