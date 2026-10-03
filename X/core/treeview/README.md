@@ -10,7 +10,7 @@ about the tree.
 `:tree` and the vim bindings are in
 [`vim-treeview`](../../integration/vim/vim-treeview).
 
-Optional — install it from the manager. Only `vim` and the `default` theme are
+Optional — install it from the manager. Only `vim`, `manager` and the `default` theme are
 part of a cdin build.
 
 **Full page:** [treeview — what it does, what you press, and how it works](../../../docs/plugins/treeview.md)

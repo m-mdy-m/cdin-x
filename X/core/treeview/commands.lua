@@ -5,9 +5,12 @@
 -- unregistered as a unit, so the view module is only about drawing and
 -- navigating.
 --
--- Two groups:
+-- Three groups:
 --   * global     — work whether or not the tree has focus
 --   * view-scoped— cursor movement and actions that need the tree focused
+--   * keystroke  — one command whose only job is to give a single key a
+--                  predicate, so a keystroke can yield to another view without
+--                  the command behind it becoming unavailable
 local core    = require "core"
 local common  = require "core.utils.common"
 local config  = require "core.config"
@@ -164,6 +167,28 @@ local function when_focused()
   return core.active_view == M.view and M.view.visible
 end
 
+-- F2 is the log view's key. Its header advertises it for switching between the
+-- editor's log and the native one, and `log:switch-source` is already scoped to
+-- that view, so it declines everywhere else and wins on this stroke — but only
+-- if something on this side of the stroke declines too. A stroke is a fallback
+-- chain and `keymap.add` prepends, so an always-available command here would
+-- take F2 in the log view as well and the header would be advertising a lie.
+--
+-- Same shape as the FOCUSED group below, and for the same reason: the `-key`
+-- suffix is a command that exists to give one keystroke a predicate, leaving
+-- the real command (`treeview:toggle`) available from the palette and from
+-- every integration whatever view is active.
+local function unless_log_view()
+  local ok, LogView = pcall(require, "core.views.logview")
+  if not ok or not LogView then return true end
+  local view = core.active_view
+  return not (view and view:is(LogView))
+end
+
+local KEYSTROKE = {
+  ["treeview:toggle-key"] = function() command.perform("treeview:toggle") end,
+}
+
 local FOCUSED = {
   ["treeview:rename-key"]       = function() command.perform("treeview:rename") end,
   ["treeview:delete-key"]       = function() command.perform("treeview:delete") end,
@@ -175,19 +200,23 @@ local FOCUSED = {
   ["treeview:expand-or-child"]     = function() M.view:expand_or_go_to_first_child() end,
 }
 
-local GLOBAL_NAMES, FOCUSED_NAMES = {}, {}
+local GLOBAL_NAMES, FOCUSED_NAMES, KEYSTROKE_NAMES = {}, {}, {}
 for name in pairs(GLOBAL) do GLOBAL_NAMES[#GLOBAL_NAMES + 1] = name end
 for name in pairs(FOCUSED) do FOCUSED_NAMES[#FOCUSED_NAMES + 1] = name end
+for name in pairs(KEYSTROKE) do KEYSTROKE_NAMES[#KEYSTROKE_NAMES + 1] = name end
 table.sort(GLOBAL_NAMES)
 table.sort(FOCUSED_NAMES)
+table.sort(KEYSTROKE_NAMES)
 
 function M.register(view)
   M.view = view
   command.add(nil, GLOBAL, true)
   command.add(when_focused, FOCUSED, true)
+  command.add(unless_log_view, KEYSTROKE, true)
 end
 
 function M.unregister()
+  command.remove(KEYSTROKE_NAMES)
   command.remove(GLOBAL_NAMES)
   command.remove(FOCUSED_NAMES)
   M.view = nil
