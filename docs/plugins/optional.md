@@ -27,8 +27,11 @@ config.direction = "rtl"
 config.shaping_enabled = false
 ```
 
-Both are applied with `~= false` rather than assigned, so a `nil` from an older
-config file does not turn a feature off.
+**Only `shaping_enabled` is guarded.** It is applied with `~= false` rather than
+assigned, so a `nil` from an older config file does not turn the feature off.
+`config.direction` is not: it is read as `config.direction or "auto"` and then
+**assigned unconditionally** on every toggle, so the first press overwrites
+whatever you set and your starting value is gone for the rest of the session.
 
 ## theme_switcher
 

@@ -24,7 +24,7 @@ names.
 ## Reading the list
 
 **It is fuzzy.** A non-contiguous subsequence match, so `fnf` finds
-*finder: core find file*. That is `common.fuzzy_match`, and it is a stronger
+*core: find file*. That is `common.fuzzy_match`, and it is a stronger
 match than [menu](menu.md)'s, which is a plain substring — the menu has
 letter shortcuts and a small list, so exactness costs nothing there.
 
@@ -34,7 +34,7 @@ gone immediately. No restart either way.
 
 **Only commands you could actually run right now are listed.**
 `command.get_all_valid()` evaluates each command's predicate and omits the ones
-that do not hold — so *window: close* is not offered while you have one pane.
+that do not hold — so a command whose predicate does not hold is not listed at all.
 Hiding it is the honest choice: the alternative is a list that offers you
 something and then refuses, which is worse than a shorter list.
 
@@ -74,7 +74,7 @@ from a broken editor, so this is not optional bookkeeping.
 
 **It registers a help entry, and keeps the handle.** The empty view's quick
 reference lists the keystroke without the runtime hardcoding it — see
-[the note in `X/README.md`](../../X/README.md) about `register_help_shortcuts`.
+[the note in `writing-a-plugin.md`](../writing-a-plugin.md) about `register_help_shortcuts`.
 The handle is handed back in `unload()`, because a plugin that does not keep it
 cannot clean up after itself, and a reload then advertises the shortcut twice.
 

@@ -28,7 +28,7 @@ popup fuzzy-matches whatever it is handed against what you have typed.
 local ac = require "X.core.autocomplete.api"
 
 ac.set {
-  name  = "my-language",      -- or just ac.set("my-language", …)
+  name  = "my-language",      -- ac.set takes ONE argument; see below.
   files = "%.lua$",           -- optional; applies everywhere if absent
   items = {                   -- a set keyed by text, or a list of items
     ["myFunction"] = "from my-language",

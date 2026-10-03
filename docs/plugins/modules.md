@@ -19,9 +19,11 @@ name from `package.loaded`, requires it again, and folds the new table's fields
 back into the old one — so a table somebody is still holding stays valid rather
 than becoming a second, stale copy of itself.
 
-This plugin does not reimplement that. It wraps it, so a module that fails to
-require is reported in the log next to the prompt rather than thrown out of the
-picker and lost.
+This plugin does not reimplement that. It wraps it in a `pcall`, so a module
+that fails to require closes the picker rather than throwing out of it — and
+reports nothing. There is a log line on the success path (`Reloaded module
+"x"`) and none on the failure path: the error is caught, returned, and never
+read. If a reload appears to do nothing, `core:open-log` will not tell you why.
 
 **Reloading re-runs a module's top-level code, and nothing else.** Whatever it
 registered *while loading* is not undone unless it has an `unload()` of its own.

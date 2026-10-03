@@ -209,8 +209,9 @@ declarations so you find out at build time instead.
 
 ## The third worked example: refreshing one thing when another changes
 
-`git-treeview` exists for this shape: the working directory changed, so the file
-tree's contents are wrong.
+`vim-treeview` exists for this shape: the working directory changed, so the file
+tree's contents are wrong. (`git-treeview` is a *different* integration — it puts
+git badges on the tree and never touches vim's registry at all.)
 
 ```lua
 registry.on("cwd_changed", function()
@@ -259,7 +260,7 @@ essential entry.
 | `X/integration/vim/vim-tab/` | ex-commands with aliases and path completion |
 | `X/integration/vim/vim-window/` | two seams at once — `wmap` and `key` — and why one table serves both <kbd>Ctrl</kbd>+<kbd>W</kbd> and `:wincmd` |
 | `X/integration/vim/vim-git/` | three files, and a menu section that quotes a user-supplied string |
-| `X/integration/git-treeview/` | the one event there is |
+| `X/integration/vim/vim-treeview/` | the one subscriber to `cwd_changed` |
 
 [examples/03-vim-word-count](../../examples/03-vim-word-count) is a third one,
 written to be read in one sitting.
