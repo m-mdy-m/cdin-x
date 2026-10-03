@@ -349,6 +349,141 @@ for name, entry in pairs(known) do
   end
 end
 
+-- ── keystrokes have one spelling ─────────────────────────────────────────
+--
+-- The host does not look a keystroke up by meaning. It *builds* the string it
+-- will look up — `ctrl+`, then `alt+`, then `altgr+`, then `shift+`, then the
+-- key's own name — and compares that string for equality, with no
+-- normalisation. So a stroke that differs in modifier order, in case, or in
+-- where its `+` signs are is not a near miss: it is a string no key press can
+-- produce, and the binding carrying it is dead — silently, because a miss in
+-- `keymap.on_key_pressed` returns false and says nothing.
+--
+-- `["ctrl+shift+alt+n"]` sat in treeview's keymap for months being exactly
+-- that. So this is checked here, where a typo costs a lint run instead of an
+-- afternoon of pressing keys.
+--
+-- The rule is the host's (core.input.keymap) and cdin-x cannot require host
+-- code — see the independence rule above — so it is restated here. The two
+-- copies have to agree; cdin's own tests cover its side.
+local MODIFIER_ORDER = { "ctrl", "alt", "altgr", "shift" }
+local MODIFIER_RANK, MODIFIER_SET = {}, {}
+for idx, mk in ipairs(MODIFIER_ORDER) do
+  MODIFIER_RANK[mk] = idx
+  MODIFIER_SET[mk] = true
+end
+
+-- Modifier names the input layer has never heard of. `keymap.modkeys` is fed
+-- only by "left ctrl", "right ctrl", "left shift", "right shift", "left alt"
+-- and "right alt", so a stroke spelled with one of these is as dead as one
+-- spelled out of order — and "cmd"/"super" is what a keymap written for
+-- another editor reaches for by reflex.
+local FOREIGN_MODIFIERS = {
+  cmd = true, command = true, meta = true, super = true, win = true,
+  windows = true, control = true, option = true, opt = true, hyper = true,
+}
+
+-- Returns the stroke as the input layer would build it, or nil plus the reason
+-- it never can and — where only the spelling is wrong — the form that works.
+local function canonical_stroke(stroke)
+  if type(stroke) ~= "string" or stroke == "" then return nil, "not a keystroke" end
+
+  local parts, pos = {}, 1
+  while true do
+    local at = stroke:find("+", pos, true)
+    parts[#parts + 1] = at and stroke:sub(pos, at - 1) or stroke:sub(pos)
+    if not at then break end
+    pos = at + 1
+  end
+  for _, part in ipairs(parts) do
+    if part == "" then
+      return nil, "'+' joins modifiers and nothing else, so this stroke has an empty part"
+    end
+  end
+
+  -- What was meant, said back the only way the runtime can look it up: the
+  -- modifiers it recognised, in the order the runtime builds them, then the
+  -- key, lowercased.
+  local mods, key_parts = {}, {}
+  for _, part in ipairs(parts) do
+    if MODIFIER_SET[part] then mods[part] = true else key_parts[#key_parts + 1] = part end
+  end
+  local canonical = {}
+  for _, mk in ipairs(MODIFIER_ORDER) do
+    if mods[mk] then canonical[#canonical + 1] = mk end
+  end
+  for _, part in ipairs(key_parts) do canonical[#canonical + 1] = part:lower() end
+  local suggestion = table.concat(canonical, "+")
+
+  local seen = 0
+  for _, part in ipairs(parts) do
+    if MODIFIER_SET[part] then
+      if MODIFIER_RANK[part] <= seen then
+        return nil, ("%q is repeated or out of order — modifiers are built ctrl, alt, altgr, shift")
+          :format(part), suggestion
+      end
+      seen = MODIFIER_RANK[part]
+    end
+  end
+
+  -- Only when something follows it: a bare "super" is a JavaScript keyword in
+  -- a syntax table, not a modifier with a key missing.
+  if #parts > 1 and FOREIGN_MODIFIERS[parts[1]] then
+    return nil, ("%q is not a modifier this input layer reports; it knows ctrl, alt, altgr and shift")
+      :format(parts[1]), suggestion
+  end
+
+  if #key_parts == 0 then return nil, "modifiers but no key", suggestion end
+  if #key_parts > 1 then
+    return nil, "the key is one key name; '+' joins modifiers and is not part of it", suggestion
+  end
+  local key = key_parts[1]
+  if key:find("%u") then
+    return nil, "key names arrive lowercased from the input layer", suggestion
+  end
+
+  return suggestion
+end
+
+-- Only a token that names a modifier *and* a key is even a candidate. Every
+-- other `["…"] =` in the tree is a syntax keyword (`["super"]` is one in
+-- javascript.lua), a theme colour or a manifest field, and this check must
+-- not be the thing that fails on one of those.
+-- (Spelled as a prefix test rather than a pattern: Lua patterns have no
+-- alternation.)
+local function names_a_modifier(token)
+  if not token:find("+", 1, true) then return false end
+  for _, mk in ipairs(MODIFIER_ORDER) do
+    if token:sub(1, #mk + 1) == mk .. "+" then return true end
+  end
+  local first = token:match("^[^%+]+")
+  return first ~= nil and FOREIGN_MODIFIERS[first] == true
+end
+
+for _, dir in ipairs(CODE_DIRS) do
+  for _, file in ipairs(code_files(dir)) do
+    local handle = io.open(file, "rb")
+    if handle then
+      local code = strip_comments(handle:read("*a") or "")
+      handle:close()
+
+      for token in code:gmatch('%["([^"]*)"%]%s*=') do
+        if names_a_modifier(token) then
+          local canonical, reason, suggestion = canonical_stroke(token)
+          if not canonical then
+            errors[#errors+1] = string.format(
+              "%s binds %q, which no key press can produce: %s.%s",
+              file, token, reason,
+              suggestion and suggestion ~= token
+                and (" Write it as " .. string.format("%q", suggestion) .. ".")
+                or "")
+          end
+        end
+      end
+    end
+  end
+end
+
 -- ── the bundle itself ───────────────────────────────────────────────────
 --
 -- The one check that exercises the real code path. Everything above is a

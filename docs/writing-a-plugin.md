@@ -184,17 +184,29 @@ declares the dependency in its manifest so the manager can order the load.
 
 ## `essential = true` means something specific
 
-Exactly one plugin and exactly one theme carry it: `vim` and the `default`
-theme. A cdin build cannot start without them, so `scripts/bundle.py` copies
-them in.
+Two plugins and exactly one theme carry it: `vim`, `manager`, and the `default`
+theme. A cdin build bundles them in, so a build with nothing else installed
+still opens a working editor with a reachable extension panel.
 
 Because an essential plugin is copied **alone**, every `require "X.…"` inside
 it has to resolve within its own subtree. The bundle contains that plugin and
 nothing else, so a require that escapes it resolves to nothing — and it fails
 at *startup in a built editor*, which is the worst place to find out.
 
-`make validate` checks this. There is no other way to catch it that isn't a
-built binary.
+`manager` is the one essential plugin whose code is not under `X/`: it lives at
+the checkout root, in `cdinx/`. Rather than have the bundler guess at what an
+essential plugin needs, the plugin says so:
+
+```lua
+bundle_with = { "cdinx" },
+```
+
+and `scripts/bundle.py` copies those paths in beside it, layout intact. An
+undeclared dependency is a build whose editor starts and then does nothing, and
+nobody should have to debug that at runtime.
+
+`make validate` checks the self-containment rule. It does **not** yet check
+`bundle_with` in either direction — see the known issues in the changelog.
 
 If you're not sure whether a plugin is essential, it isn't.
 
@@ -229,6 +241,17 @@ keymap.add { ["ctrl+alt+h"] = "hello:say" }
 Binding a name rather than a function is what lets <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd>
 find and run your command without knowing that it exists.
 
+**A stroke is spelled, not described.** The editor builds the string it looks
+up — every modifier held, in the order `ctrl`, `alt`, `altgr`, `shift`, then
+the key's own name — and matches that string for equality, with no
+normalisation, aliases or case folding. So the modifiers have to be written in
+that order: `ctrl+alt+shift+n`, not `ctrl+shift+alt+n`, and a key is one name,
+lowercase, with no `+` inside it. A stroke spelled any other way is not a near
+miss, it is a string no key press produces — a binding that can never fire and
+says nothing when it does not. `["ctrl+shift+alt+n"]` shipped in treeview that
+way. The host now reports every such stroke in the log at boot, and
+`make validate` fails on one before it ships.
+
 Both have matching `remove`, and a plugin that registers is expected to
 unregister.
 
@@ -243,6 +266,8 @@ until much later:
 - a `require` that crosses a plugin boundary without a declared dependency
 - a `register` without a matching `unregister`
 - an `EXEDIR` reference, or the old `core.x` namespace, anywhere in `cdinx/` or `X/`
+- a keystroke no key press can produce — wrong modifier order, an uppercase
+  key, a `+` inside the key, or a modifier the input layer does not report
 - an essential plugin that isn't self-contained
 - and finally it **runs the real bundler twice** and compares, so the thing a
   cdin build consumes is checked rather than assumed
