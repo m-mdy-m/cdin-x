@@ -20,18 +20,53 @@ for.
 
 ## Modes
 
-| mode | what you are doing | how you leave it |
-| --- | --- | --- |
-| **normal** | moving and running commands | <kbd>i</kbd> to insert, <kbd>v</kbd> for visual |
-| **insert** | typing | <kbd>Esc</kbd> |
-| **visual** | selecting characters | <kbd>Esc</kbd> |
-| **visual line** | selecting whole lines, with <kbd>V</kbd> | <kbd>Esc</kbd> |
-| **command** | after <kbd>:</kbd> | <kbd>Esc</kbd>, or running the command |
+Four, plus the `:` line. The mode is shown as a coloured pill at the left of the
+status bar, and it is **per view** — two documents side by side can be in
+different modes at once, and switching between them changes neither.
 
-The mode is shown as a coloured pill at the left of the status bar, and it goes
-through normal → insert → visual as you would expect. Pressing <kbd>Esc</kbd>
-in insert mode returns to normal, which is the single most important habit in
-the whole thing.
+| mode | how you get into it | how you leave it |
+| --- | --- | --- |
+| **normal** | the default when you open a document, and <kbd>Esc</kbd> from any other mode | — |
+| **insert** | <kbd>i</kbd> <kbd>a</kbd> <kbd>I</kbd> <kbd>A</kbd> <kbd>o</kbd> <kbd>O</kbd> <kbd>s</kbd> <kbd>S</kbd> <kbd>C</kbd>, and <kbd>c</kbd> followed by a motion or a text object | <kbd>Esc</kbd> |
+| **visual** | <kbd>v</kbd> | <kbd>Esc</kbd>, or <kbd>v</kbd> again |
+| **visual line** | <kbd>V</kbd> | <kbd>Esc</kbd>, or <kbd>V</kbd> again |
+| **command** | <kbd>:</kbd> | <kbd>Esc</kbd>, or running what you typed |
+
+The ones that take typing, spelled out:
+
+- <kbd>i</kbd> — insert **at** the caret. <kbd>a</kbd> — insert **after** it.
+  <kbd>I</kbd> and <kbd>A</kbd> are those same two ideas at the first non-blank
+  and the end of the line. <kbd>o</kbd> and <kbd>O</kbd> open a line below or
+  above and insert into it.
+- <kbd>s</kbd> — change the character under the caret and type over it.
+  <kbd>S</kbd> is the whole line, <kbd>C</kbd> is to the end of the line, and
+  <kbd>c</kbd> followed by a motion or a text object is the general form:
+  <kbd>ci"</kbd> changes inside the quotes, <kbd>cw</kbd> changes a word.
+
+**<kbd>Esc</kbd> is the key that matters.** It is the way out of insert mode, out
+of a selection, and out of the `:` line — and nothing you can press by accident
+leaves you somewhere you cannot get back from.
+
+### Selecting: <kbd>v</kbd> and <kbd>V</kbd>
+
+<kbd>v</kbd> starts a character-wise selection at the caret. Move with any motion
+— <kbd>w</kbd>, <kbd>b</kbd>, <kbd>e</kbd>, <kbd>j</kbd>, the arrows — and the
+selection grows with you. Press <kbd>v</kbd> again to drop it, or <kbd>Esc</kbd>.
+
+<kbd>V</kbd> is the same for whole lines: it takes the line the caret is on, and
+<kbd>j</kbd> / <kbd>k</kbd> add the lines below and above. In either mode you can
+then press <kbd>d</kbd> to delete, <kbd>y</kbd> to copy, <kbd>c</kbd> to change,
+<kbd>u</kbd> / <kbd>U</kbd> to change case, and <kbd>o</kbd> to swap which end
+the caret is on. <kbd>i</kbd>… or <kbd>a</kbd>… re-aims the selection at a text
+object instead.
+
+The two modes use the **same colour** in the status pill on purpose: they differ
+in what they select, not in what they are. The label is what tells them apart —
+`[VISUAL]` against `[VISUAL LINE]`.
+
+**There is no replace mode.** <kbd>r</kbd> takes the characters you give it,
+replaces that many, and puts you straight back in normal mode, which is what
+vim's <kbd>r</kbd> does.
 
 ## Moving
 
@@ -44,6 +79,7 @@ declared as data in `vimode/motions.lua`.
 | --- | --- |
 | <kbd>h</kbd> <kbd>l</kbd> | one character left / right, never across a line |
 | <kbd>j</kbd> <kbd>k</kbd> | one line down / up, keeping the column |
+| <kbd>←</kbd> <kbd>→</kbd> <kbd>↑</kbd> <kbd>↓</kbd> | the same four, under the name the host reports them — see below |
 | <kbd>w</kbd> <kbd>W</kbd> | next word start / next WORD start |
 | <kbd>b</kbd> <kbd>B</kbd> | previous word start / previous WORD start |
 | <kbd>e</kbd> <kbd>E</kbd> | end of this word, or of the next one |
@@ -66,6 +102,22 @@ words. Paging is <kbd>Ctrl</kbd>+<kbd>F</kbd> and <kbd>Ctrl</kbd>+<kbd>B</kbd> f
 a screen, <kbd>Ctrl</kbd>+<kbd>U</kbd> and <kbd>Ctrl</kbd>+<kbd>D</kbd> for half
 of one. In vim mode <kbd>Ctrl</kbd>+<kbd>D</kbd> is half a screen rather than the
 editor's select-word, which <kbd>iw</kbd> already does.
+
+### The arrow keys
+
+The four arrows are the four `hjkl` motions under another name, and they are
+mapped as exactly that — one character, not one word. So <kbd>3</kbd> then
+<kbd>→</kbd> moves three characters, <kbd>d</kbd> then <kbd>→</kbd> deletes to
+the end of the line, and in visual mode an arrow grows the selection the way
+<kbd>l</kbd> does.
+
+They work in **normal and visual mode, and only while the document is the
+focused view**. That gate is deliberate: [`treeview`](treeview.md),
+[`search`](search.md) and the autocomplete popup all bind these same four keys
+for their own lists, and each wants them while *it* has focus. So arrows move
+the caret in a document, the tree selection in the tree, and the results list in
+project search — with no configuration and no plugin able to take them away from
+the others.
 
 ## Text objects
 
