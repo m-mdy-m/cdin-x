@@ -92,6 +92,17 @@ function M.prompt_and_run()
 end
 
 -- Open a separate terminal window. Non-blocking: cdin keeps running.
+--
+-- `system.exec` starts a process; it does not go through a shell. `start` is a
+-- cmd *builtin*, so handing it straight over asks the loader for an executable
+-- called "start", finds none, and fails in silence — which is what
+-- `vim-shell:open-terminal` was doing on Windows: the command ran, the key did
+-- nothing, and nothing was logged. Every other Windows call site in this
+-- repository wraps in `cmd.exe /C` for the same reason (see
+-- `cdinx/manager/fetch.lua` and `X/core/git/manager/ops.lua`).
+--
+-- `-NoExit` matters as much as the wrapping: without it the new shell runs,
+-- prints its prompt, and closes before anyone can type.
 function M.open_terminal()
   if not M.IS_WIN then
     local term = os.getenv("TERMINAL") or os.getenv("TERM_PROGRAM") or "xterm"
@@ -99,13 +110,15 @@ function M.open_terminal()
     return
   end
   local shell = config.shell_win
+  local target
   if shell == "powershell" then
-    system.exec("start powershell -NoExit")
+    target = "powershell -NoExit"
   elseif shell == "pwsh" then
-    system.exec("start pwsh -NoExit")
+    target = "pwsh -NoExit"
   else
-    system.exec("start cmd")
+    target = "cmd"
   end
+  system.exec('cmd.exe /C start ' .. target)
 end
 
 function M.platform()

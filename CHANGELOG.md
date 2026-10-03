@@ -330,6 +330,20 @@ Inside vim mode. Outside it, and on the panel and the finders, it is unchanged.
   removes a character and never touches the clipboard, so `x` then `p` pasted
   whatever was copied last. It goes through `doc:cut` now.
 
+- **The arrow keys did nothing in normal and visual mode.** The host names them
+  `up` / `down` / `left` / `right` and vim has no arrow keys, so they reached the
+  motion table as the word "up", matched nothing, and fell through. Insert mode
+  hid it, because insert mode does not read keys and the host moves the caret
+  there. They are `hjkl` now — character-wise, so a count and an operator both
+  work — and only while the document is the focused view, which is what leaves
+  the tree, project search and the autocomplete popup their own arrows.
+
+- **`Ctrl`+`Shift`+`;` did not open a terminal on Windows.** `open_terminal()`
+  called `system.exec("start cmd")`, and `start` is a cmd *builtin*:
+  `system.exec` starts a process rather than a shell, so the loader looked for an
+  executable named "start", found none, and failed without a word. Every other
+  Windows call site here wraps in `cmd.exe /C`; this one now does too.
+
 ### Documentation
 
 Every plugin in the catalog was read against its documentation, page by page,

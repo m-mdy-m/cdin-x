@@ -67,6 +67,25 @@ local SHIFTED = {
   ["`"] = "~",
 }
 
+-- The arrows, which are the four `hjkl` motions under another name.
+--
+-- The host reports a key it cannot print by its name — `up`, `left` — and vim
+-- has no arrow keys at all, so without this table they reach the motion table
+-- as the word "up", match nothing, and fall through to the host. In insert mode
+-- that is invisible, because insert mode is not reading keys and the host moves
+-- the caret. In normal and visual mode the caret simply does not go anywhere,
+-- which reads as "arrows are broken in vim mode" rather than as "this plugin
+-- does not implement them".
+--
+-- Character-wise on purpose: these are the same motions as `hjkl`, so a count
+-- works (`3` then right-arrow), an operator works (`d` then right-arrow), and
+-- visual mode extends the selection the way `l` does. Not word-wise, which some
+-- configurations bind, and which would silently change what `d` then
+-- right-arrow deletes.
+local ARROWS = {
+  left = "h", right = "l", up = "k", down = "j",
+}
+
 -- The character a key produces, whichever spelling it arrived in.
 --
 -- A shifted letter comes out uppercase, so the rest of this file compares
@@ -486,6 +505,17 @@ local function resolve_pending(view, char)
   local doc  = view.doc
   local kind = pending.kind
 
+  -- `f` and `r` are waiting for a *character*, and the keys that are not
+  -- characters arrive as names: `up`, `f5`, `pageup`. Letting one through would
+  -- have `r` insert the string "up" into the buffer, or send `f` looking for a
+  -- two-character sequence it can never match. Abandoning the sequence is what
+  -- vim does — an arrow is a key of its own, not a target — and returning false
+  -- lets the caller handle it as one, so the caret moves instead.
+  if (kind == "find" or kind == "replace") and #char ~= 1 then
+    pending, count_buf = nil, ""
+    return false
+  end
+
   if kind == "ctrl_w" then
     pending, count_buf = nil, ""
     local wcmd = registry.wmap_get(char)
@@ -766,6 +796,19 @@ function M.handle_key(k)
 
   local shift = keymap.modkeys.shift
   local tok   = token_for(k, shift)
+
+  -- An arrow is `hjkl`, but only while the document is the focused view.
+  --
+  -- The gate is the whole point. The tree, the project-search list and the
+  -- autocomplete popup all bind these same four names, and they want them
+  -- exactly as the host spells them; translating here without it would take
+  -- arrows away from every one of them the moment a document was open
+  -- somewhere. Same idiom as treeview's `when_focused`.
+  --
+  -- `tok` is built above this line on purpose: the registry is asked about
+  -- `"up"`, not about the `k` it became, so an integration that later wants to
+  -- claim an arrow still can.
+  if view and core.active_view == view then k = ARROWS[k] or k end
 
   -- Shift and `;` is `:`, the way it is in every terminal. Checked against the
   -- base key rather than the character, because `;` reaches here as the base key
