@@ -15,8 +15,8 @@ each is a key taken away for nothing.
 `core:open-project-module` opens the same file the runtime loads at startup,
 so the command cannot show you a different file from the one that actually
 runs. `core:reload-module` wraps the runtime's `core.reload_module` rather than
-reimplementing it, so a module that fails to require is reported in the log
-next to the prompt instead of thrown out of it.
+reimplementing it, inside a `pcall`, so a module that fails to require closes
+the picker instead of throwing out of it.
 
 Reloading re-runs a module's top-level code only. Whatever it registered while
 loading is not undone unless it has an `unload()` of its own, so a module that

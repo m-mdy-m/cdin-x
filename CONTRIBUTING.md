@@ -65,9 +65,11 @@ sections, status pills, help entries. Keep the handle
    name is otherwise a silent no-op: the sort is given a name nothing provides,
    and nothing complains.
 
-4. **Exactly one essential plugin and one essential theme.** Both are counted,
-   not just "at least one", because a build that bundles two themes has no
-   answer to which one to start with.
+4. **The essential set is counted.** Exactly one essential *theme*, because a
+   build that bundles two themes has no answer to which one to start with. The
+   plugin count is reported but not bounded — `vim` and `manager` are both
+   essential today, and a third would pass validation silently. If you are
+   adding one, the check needs extending in the same change.
 
 5. **Every essential plugin is self-contained.** Its `require "X.…"` calls all
    resolve inside its own directory. There is no cheap static check for this —

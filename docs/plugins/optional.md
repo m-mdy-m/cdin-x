@@ -1,6 +1,6 @@
 # The optional plugins
 
-Three. None of them is part of a cdin build — only `vim` and the `default`
+Three. None of them is part of a cdin build — only `vim`, `manager` and the `default`
 theme are — and all three are installed from the manager like anything else.
 
 ## rtl_toggle

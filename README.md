@@ -28,8 +28,11 @@ broken" and "an extension misbehaves" stop being the same investigation.
 theme, and the fonts. A cdin build without these is not a working editor, so a
 build copies them in from this repository. They are selected by a marker —
 `essential = true` in a plugin's manifest — and exactly three things carry it:
-`vim`, `manager`, and the `default` theme. Nothing else does, and
-`make validate` fails if the count is wrong.
+`vim`, `manager`, and the `default` theme. Nothing else does.
+
+`make validate` fails if **no** essential plugin is found, and fails if the
+number of essential *themes* is not exactly one. It reports the plugin count but
+does not bound it, so a third essential plugin would pass silently.
 
 The manager is in that list because an editor whose only answer to "what is
 installed, and how do I change that" is a script in another directory is a
@@ -116,8 +119,8 @@ make bundle DEST=/path/to/cdin/build/<platform>/data
 make validate        # the gate
 make manifest        # regenerate X/manifest.lua
 make list            # print the catalog
-make test-panel      # the panel's rows and search
-make test-panel-view # the panel, drawn
+# (no test target exists yet)
+
 ```
 
 `make validate` is the one that matters. It checks the required files, the
