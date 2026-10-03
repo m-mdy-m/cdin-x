@@ -18,6 +18,7 @@ return {
     "cdinx/manager/fetch.lua",
     "cdinx/manager/init.lua",
     "cdinx/manager/lifecycle.lua",
+    "cdinx/manager/loader.lua",
     "cdinx/manager/registry.lua",
     "cdinx/manager/runtime.lua",
     "cdinx/manager/state.lua",

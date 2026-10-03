@@ -6,10 +6,10 @@ the <kbd>Shift</kbd>+<kbd>M</kbd> panel draws.
 ```text
 cdinx/init.lua          bootstrap — publishes itself on core.cdinx
 cdinx/command.lua       the commands and the menu
-cdinx/panel.lua         the panel itself
+cdinx/panel/            the panel itself, six files
 cdinx/config.lua        paths, read from the host's config
 cdinx/manifest.lua      the manifest reader
-cdinx/manager/          catalog, deps, lifecycle, registry, runtime, state
+cdinx/manager/          catalog, fetch, deps, lifecycle, loader, registry, runtime, state
 ```
 
 It is installed at `<site>/cdinx/` and reaches every module by its path from

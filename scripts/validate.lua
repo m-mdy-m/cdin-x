@@ -533,7 +533,7 @@ local function check_bundle()
   -- directory, and a differently-spelled absolute one again under a POSIX
   -- emulation layer. So the relative part is recovered from the last
   -- top-level entry rather than by stripping a prefix that may not match.
-  local BUNDLE_TOPLEVEL = { "BUNDLE.lua", "X", "fonts", "plugins", "themes" }
+  local BUNDLE_TOPLEVEL = { "BUNDLE.lua", "X", "cdinx", "fonts", "plugins", "themes" }
   local function bundle_rel(path)
     local p = path:gsub("\\", "/")
     local cut
@@ -557,6 +557,13 @@ local function check_bundle()
       or rel:match("^themes/[^/]+/theme%.lua$")
       or rel:match("^X/core/[^/]+/")          -- an essential plugin's own files
       or rel:match("^X/core/[^/]+%.lua$")
+      -- `bundle_with = { "cdinx" }` support files, copied verbatim so a bundled
+      -- `require "cdinx…"` resolves; vim declares it. They are the manager, not
+      -- a plugin, and they are inside the bundle on purpose: the tree the
+      -- bundler copies is the tree cdinx/manifest.lua lists as core_files.
+      or rel:match("^cdinx/[^/]+%.lua$")
+      or rel:match("^cdinx/[^/]+%.md$")
+      or rel:match("^cdinx/[^/]+/[^/]+%.lua$")
       or rel:match("^fonts/[^/]+$")
     if not allowed then
       errors[#errors+1] = "bundle contains a non-essential entry: " .. rel
