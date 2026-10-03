@@ -29,7 +29,7 @@
 -- merely to look the plugin up.
 local M = {
   name = "vim",
-  version = "0.3.0",
+  version = "0.3.1",
   description = "Vim-style modal editing and command-line integration",
   author = "cdin Team",
   license = "MIT",

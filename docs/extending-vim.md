@@ -96,6 +96,18 @@ is still the one you registered. That's what lets two plugins both answer to
 `H` and lets the later one win without the earlier one's `unload` deleting it
 out from under it.
 
+**Register a key the host reports by name under that name.** `register_key` is
+asked about the key as the host spells it, before vim mode rewrites it: `tab`,
+`home`, `space`, `pageup`, `f3`, and the shifted spellings `shift+n` for a
+capital and `*` for the character itself. So `["tab"]` works, which is how
+`vim-window` moves panes — and a key vim mode *does* implement, spelled as a
+motion (`home` is `0`, `end` is `$`, `space` is `l`), never reaches the registry
+while a document has focus, because vim is asked first.
+
+Anything the registry declines goes on to the editor's own keymap, unless it is a
+single printable character — those are swallowed, because vim beeps at a letter
+it does not know and swallowing is what the beep is made of.
+
 ### actions
 
 A named function, for capabilities that want to be callable rather than

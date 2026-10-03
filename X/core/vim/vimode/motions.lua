@@ -303,13 +303,28 @@ motion("k", { run = function(doc, l, c, n) return vertical(doc, l, c, n, -1) end
 
 -- Within a line. `$` moves down `count - 1` lines first, which is what makes
 -- `2$` the end of the line below rather than a case of its own.
+--
+-- `last_col`, not `eol`, and the difference is one column on every line. `eol`
+-- is one *past* the last character — it is the newline — and it is the right
+-- answer for the end of a span and for where `A` types, but not for where the
+-- caret stands. `$` puts the caret on the last character, so `$` overshot by
+-- one, `End` overshot by one, and `2$` overshot by one on the line below.
+-- `text.last_col` is documented as "where `$` puts the cursor in vim"; it was
+-- written and then not used here.
+--
+-- `inclusive` because the character `$` lands on belongs to the range: `d$` from
+-- the middle of `abcdef` removes `def` and leaves `ab`. Without it `d$` left
+-- the last character behind, and the header of this file already promised the
+-- opposite.
 motion("$", { run = function(doc, l, c, n)
   local target = text.clamp(doc, l + times(n) - 1, 1)
-  return target, text.eol(doc, target)
-end })
+  return target, text.last_col(doc, target)
+end, inclusive = true })
 motion("0", { run = function(doc, l) return l, 1 end })
 motion("^", { run = function(doc, l) return l, text.first_nonblank(doc, l) end })
-motion("|", { run = function(doc, l, c, n) return l, math.min(times(n), text.eol(doc, l)) end })
+-- `|` stops at the last character too: vim's `|` is "column n", and no column
+-- is past the end of the line.
+motion("|", { run = function(doc, l, c, n) return l, math.min(times(n), text.last_col(doc, l)) end })
 
 -- words
 motion("w", { run = function(doc, l, c, n) return word_forward(doc, l, c, n, false) end })

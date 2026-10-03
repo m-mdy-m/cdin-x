@@ -334,6 +334,33 @@ Inside vim mode. Outside it, and on the panel and the finders, it is unchanged.
   work — and only while the document is the focused view, which is what leaves
   the tree, project search and the autocomplete popup their own arrows.
 
+- **vim 0.3.1 — <kbd>Home</kbd>, <kbd>End</kbd>, <kbd>Space</kbd>,
+  <kbd>PageUp</kbd> and every other key the host reports by name.** Four names
+  were translated and the rest were not, so `home` reached the motion table as
+  the word "home" — and then the command table answered "handled" for every key
+  it did not match, so the editor never saw it either. A dead key, with no error
+  and nothing on screen: they worked in insert mode and did nothing in normal
+  mode, which is backwards, because insert mode does not read keys at all.
+  <kbd>Home</kbd> is <kbd>0</kbd>, <kbd>End</kbd> is <kbd>$</kbd>,
+  <kbd>Space</kbd> is <kbd>l</kbd> and <kbd>Enter</kbd> is <kbd>+</kbd>, under
+  the same focus gate as the arrows; everything else — <kbd>PageUp</kbd>,
+  <kbd>PageDown</kbd>, <kbd>Delete</kbd>, the function keys — is handed back to
+  the editor instead of being swallowed. A shifted arrow or
+  <kbd>Shift</kbd>+<kbd>Home</kbd> no longer arrives as <kbd>H</kbd>,
+  <kbd>M</kbd>, <kbd>L</kbd> or <kbd>)</kbd>, either.
+
+- **A single normal-mode key registered by a plugin could not fire.** The registry
+  lookup sat below that same `return true`, so it was unreachable: `/` and
+  <kbd>n</kbd> from `vim-search`, <kbd>Tab</kbd> from `vim-window`,
+  <kbd>m</kbd> from `vim-menu` and <kbd>M</kbd> from the manager were all dead.
+
+- **`$` landed one column past the last character, and was not inclusive.** It
+  resolved to the newline rather than to the character before it — `text.eol`
+  where the header of `vimode/motions.lua` says `text.last_col` belongs, and
+  where `last_col`'s own docstring already said it belonged — and it was not
+  marked inclusive, which is why `d$` left the last character of the line behind.
+  `|` clamped to the same off-by-one column.
+
 - **`Ctrl`+`Shift`+`;` did not open a terminal on Windows.** `open_terminal()`
   called `system.exec("start cmd")`, and `start` is a cmd *builtin*:
   `system.exec` starts a process rather than a shell, so the loader looked for an

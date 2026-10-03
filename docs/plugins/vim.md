@@ -80,6 +80,9 @@ declared as data in `vimode/motions.lua`.
 | <kbd>h</kbd> <kbd>l</kbd> | one character left / right, never across a line |
 | <kbd>j</kbd> <kbd>k</kbd> | one line down / up, keeping the column |
 | <kbd>←</kbd> <kbd>→</kbd> <kbd>↑</kbd> <kbd>↓</kbd> | the same four, under the name the host reports them — see below |
+| <kbd>Space</kbd> | the same as <kbd>→</kbd> |
+| <kbd>Home</kbd> / <kbd>End</kbd> | start of line / last character of line, the same as <kbd>0</kbd> and <kbd>$</kbd> |
+| <kbd>Enter</kbd> | first non-blank of the line below, the same as <kbd>+</kbd> |
 | <kbd>w</kbd> <kbd>W</kbd> | next word start / next WORD start |
 | <kbd>b</kbd> <kbd>B</kbd> | previous word start / previous WORD start |
 | <kbd>e</kbd> <kbd>E</kbd> | end of this word, or of the next one |
@@ -103,21 +106,36 @@ a screen, <kbd>Ctrl</kbd>+<kbd>U</kbd> and <kbd>Ctrl</kbd>+<kbd>D</kbd> for half
 of one. In vim mode <kbd>Ctrl</kbd>+<kbd>D</kbd> is half a screen rather than the
 editor's select-word, which <kbd>iw</kbd> already does.
 
-### The arrow keys
+### The keys the host reports by name
 
-The four arrows are the four `hjkl` motions under another name, and they are
-mapped as exactly that — one character, not one word. So <kbd>3</kbd> then
-<kbd>→</kbd> moves three characters, <kbd>d</kbd> then <kbd>→</kbd> deletes to
-the end of the line, and in visual mode an arrow grows the selection the way
-<kbd>l</kbd> does.
+<kbd>Space</kbd>, the four arrows, <kbd>Home</kbd>, <kbd>End</kbd> and
+<kbd>Enter</kbd> are keys vim does not have, so the host reports them by name —
+`space`, `up`, `home` — and vim mode has to say what each one means. They are:
+
+| key | is |
+| --- | --- |
+| <kbd>←</kbd> <kbd>→</kbd> <kbd>↑</kbd> <kbd>↓</kbd> | <kbd>h</kbd> <kbd>l</kbd> <kbd>k</kbd> <kbd>j</kbd> |
+| <kbd>Space</kbd> | <kbd>l</kbd> |
+| <kbd>Home</kbd> / <kbd>End</kbd> | <kbd>0</kbd> / <kbd>$</kbd> |
+| <kbd>Enter</kbd> | <kbd>+</kbd> |
+
+The arrows are mapped as exactly <kbd>hjkl</kbd> — one character, not one word.
+So <kbd>3</kbd> then <kbd>→</kbd> moves three characters, <kbd>d</kbd> then
+<kbd>→</kbd> deletes to the end of the line, and in visual mode an arrow grows
+the selection the way <kbd>l</kbd> does.
 
 They work in **normal and visual mode, and only while the document is the
 focused view**. That gate is deliberate: [`treeview`](treeview.md),
-[`search`](search.md) and the autocomplete popup all bind these same four keys
-for their own lists, and each wants them while *it* has focus. So arrows move
-the caret in a document, the tree selection in the tree, and the results list in
+[`search`](search.md) and the autocomplete popup all bind these same keys for
+their own lists, and each wants them while *it* has focus. So arrows move the
+caret in a document, the tree selection in the tree, and the results list in
 project search — with no configuration and no plugin able to take them away from
 the others.
+
+Every other named key — <kbd>PageUp</kbd>, <kbd>PageDown</kbd>,
+<kbd>Delete</kbd>, the function keys — is **not** vim mode's, and is handed back
+to the editor rather than swallowed. That is why <kbd>PageDown</kbd> pages in
+vim mode too, exactly as <kbd>Ctrl</kbd>+<kbd>F</kbd> does.
 
 ## Text objects
 
@@ -287,6 +305,14 @@ vim/api.lua           an older spelling of the registry, kept working
 decline does the registry get asked. That ordering is what makes it safe for
 an integration to claim <kbd>m</kbd>: it can add a key, but it cannot shadow one
 vim already handles.
+
+And when *both* decline, the key goes back to the editor — but only if vim mode
+did not claim it, and the difference is between a key it can print and a key it
+cannot. An unclaimed letter is vim's to swallow: vim beeps at a key it does not
+know. An unclaimed *name* — `pageup`, `delete`, `f3` — is not vim's at all, and
+has to reach the host. Answering "handled" for one of those is invisible in
+insert mode (which does not read keys at all, so the host moves the caret either
+way) and is a dead key in normal mode, with nothing on screen to say why.
 
 The one exception is a **capital letter**, which is the single spelling both
 vocabularies can claim: <kbd>N</kbd> is vim's "search backwards" and

@@ -67,23 +67,36 @@ local SHIFTED = {
   ["`"] = "~",
 }
 
--- The arrows, which are the four `hjkl` motions under another name.
+-- The keys the host reports by name, spelled the way vim spells the motion they
+-- mean.
 --
--- The host reports a key it cannot print by its name — `up`, `left` — and vim
--- has no arrow keys at all, so without this table they reach the motion table
--- as the word "up", match nothing, and fall through to the host. In insert mode
--- that is invisible, because insert mode is not reading keys and the host moves
--- the caret. In normal and visual mode the caret simply does not go anywhere,
--- which reads as "arrows are broken in vim mode" rather than as "this plugin
--- does not implement them".
+-- The host reports a key it cannot print by its name — `up`, `left`, `home` —
+-- and vim has *none* of those keys at all, so without this table they reach the
+-- motion table as the word "home", match nothing, and are then swallowed by the
+-- reader. In insert mode that is invisible, because insert mode is not reading
+-- keys at all and the host moves the caret. In normal and visual mode the caret
+-- simply does not go anywhere, with nothing on screen to say why — which reads
+-- as "Home is broken in vim mode" rather than as "this plugin does not
+-- implement Home".
 --
--- Character-wise on purpose: these are the same motions as `hjkl`, so a count
--- works (`3` then right-arrow), an operator works (`d` then right-arrow), and
--- visual mode extends the selection the way `l` does. Not word-wise, which some
--- configurations bind, and which would silently change what `d` then
--- right-arrow deletes.
-local ARROWS = {
+-- Character-wise on purpose for the four arrows: they are the same motions as
+-- `hjkl`, so a count works (`3` then right-arrow), an operator works (`d` then
+-- right-arrow), and visual mode extends the selection the way `l` does. Not
+-- word-wise, which some configurations bind, and which would silently change
+-- what `d` then right-arrow deletes.
+--
+-- `home` is `0` and `end` is `$` because that is what they are in vim — column
+-- one and the last character of the line, not the first non-blank — and because
+-- it is what the host's own `home` / `end` already do. `space` is `l` for the
+-- same reason `right` is: vim has no space bar either, and a space that does
+-- nothing in normal mode is not vim. `return` is `+`, the first non-blank of
+-- the line below, which is vim's `<CR>`; left alone it would reach the host's
+-- `doc:newline` and open a line in normal mode.
+local NAMED = {
   left = "h", right = "l", up = "k", down = "j",
+  home = "0", ["end"] = "$",
+  space = "l",
+  ["return"] = "+", ["keypad enter"] = "+",
 }
 
 -- The character a key produces, whichever spelling it arrived in.
@@ -248,9 +261,16 @@ end
 -- the character. That is why `D` can mean "delete to end of line" while `d` is
 -- an operator waiting for a motion: they are different keys, and vim has always
 -- given them different meanings.
+--
+-- It answers "did I claim this key", and false means *nobody* has yet — the
+-- registry has not been asked and the host has not seen it. A bare `return true`
+-- here is what made every key the host reports by name vanish: a shifted `f3`,
+-- which matches no branch, still reported itself handled, so `f3` reached
+-- neither the integration that registered it nor the host.
 local function handle_shifted(view, char, count)
   local doc  = view.doc
   local line, col = cursor(doc)
+  local ok = false
 
   -- `char` is already uppercase by the time it reaches here: `character()`
   -- turns a shifted letter into its capital, so every comparison below is
@@ -265,12 +285,15 @@ local function handle_shifted(view, char, count)
   elseif char == "I" then
     doc:set_selection(line, text.first_nonblank(doc, line))
     mode.set(view, mode.INSERT)
+    ok = true
   elseif char == "A" then
     doc:set_selection(line, text.eol(doc, line))
     mode.set(view, mode.INSERT)
+    ok = true
   elseif char == "O" then
     command.perform("doc:newline-above")
     mode.set(view, mode.INSERT)
+    ok = true
   elseif char == "V" then
     if mode.get(view) == mode.VISUAL_LINE then
       doc:set_selection(line, col)
@@ -279,6 +302,7 @@ local function handle_shifted(view, char, count)
       doc:set_selection(line, 1, line, math.huge)
       mode.set(view, mode.VISUAL_LINE)
     end
+    ok = true
   elseif char == "S" then
     return change(view, "c", { span = text.line_span(doc, line, 1, line, 1), kind = "line" })
   elseif char == "D" then
@@ -287,17 +311,22 @@ local function handle_shifted(view, char, count)
     return change(view, "c", { span = text.span(line, col, line, text.eol(doc, line)), kind = "eol" })
   elseif char == "Y" then
     operators.apply("y", doc, view, text.line_span(doc, line, 1, line, 1))
+    ok = true
   elseif char == "X" then
     for _ = 1, (count > 0 and count or 1) do command.perform("doc:backspace") end
+    ok = true
   elseif char == "P" then
     operators.paste(doc, line, col, true)
+    ok = true
   elseif char == "J" then
     doc:set_selection(line, 1)
     command.perform("doc:join-lines")
+    ok = true
   elseif char == "~" then
     operators.apply("g~", doc, view, text.span(line, col, line, col + 1))
     local l, c = text.next(doc, line, col)
     doc:set_selection(l, c)
+    ok = true
   elseif char == "H" or char == "M" or char == "L" then
     -- The viewport is the host's to answer; `get_visible_line_range` is the same
     -- method its own page commands use, and the guard is what keeps `H` a no-op
@@ -313,25 +342,42 @@ local function handle_shifted(view, char, count)
       local at = text.clamp(doc, target, 1)
       doc:set_selection(at, math.min(col, text.eol(doc, at)))
     end
+    ok = true
   end
-  return true
+  return ok
 end
 
 -- ── normal mode's own commands ───────────────────────────────────────────
+--
+-- It answers "did I claim this key", and false means the chain matched nothing
+-- — not that the key was dealt with. `handle_normal` reads that as "ask the
+-- registry, then let the host have it".
+--
+-- The distinction is the whole of the second bug this file had. A trailing
+-- `return true` here made every key the host reports by name — `pageup`,
+-- `delete`, `f3` — answer "handled" without being handled, so it reached
+-- neither `registry.call_key` nor the host: pressing Home did nothing at all,
+-- and the plugin registry's own single keys (`tab` for the window integration,
+-- `/` and `n` for search) could never fire from here either, because the line
+-- below that was supposed to ask it was unreachable.
 local function handle_command(view, char, count)
   local doc  = view.doc
   local line, col = cursor(doc)
   local times = count > 0 and count or 1
+  local ok = false
 
   if char == "i" then
     mode.set(view, mode.INSERT)
+    ok = true
   elseif char == "a" then
     local l, c = text.next(doc, line, col)
     doc:set_selection(l, c)
     mode.set(view, mode.INSERT)
+    ok = true
   elseif char == "o" then
     command.perform("doc:newline-below")
     mode.set(view, mode.INSERT)
+    ok = true
   elseif char == "v" then
     if mode.get(view) == mode.VISUAL then
       doc:set_selection(line, col)
@@ -340,6 +386,7 @@ local function handle_command(view, char, count)
       doc:set_selection(line, col, line, col)
       mode.set(view, mode.VISUAL)
     end
+    ok = true
   elseif char == "x" then
     -- Select, then cut. Not `doc:delete`: that command removes the character but
     -- never touches the clipboard, so `x` followed by `p` would paste whatever
@@ -351,6 +398,7 @@ local function handle_command(view, char, count)
     if text.text(doc, text.span(line, col, l, c)) == "" then return true end
     doc:set_selection(line, col, l, c)
     command.perform("doc:cut")
+    ok = true
   elseif char == "s" then
     -- s: like `cl` — one character, then insert.
     local l, c = text.next(doc, line, col)
@@ -358,10 +406,13 @@ local function handle_command(view, char, count)
     if not text.is_empty(doc, span) then
       return change(view, "c", { span = span, kind = "motion", key = "l", count = times })
     end
+    ok = true
   elseif char == "p" then
     operators.paste(doc, line, col, false)
+    ok = true
   elseif char == "u" then
     command.perform("doc:undo")
+    ok = true
   elseif char == "r" then
     -- r is vim's replace-one-character. This is the one key whose meaning this
     -- reader changes: `r` used to be redo here, and it is now `Ctrl+Y`, which is
@@ -369,10 +420,11 @@ local function handle_command(view, char, count)
     -- finally does something.
     pending = { kind = "replace", count = times, line = line, col = col,
                 t = system.get_time() }
+    ok = true
   elseif char == "." then
     return repeat_last(view)
   end
-  return true
+  return ok
 end
 
 -- ── visual mode ──────────────────────────────────────────────────────────
@@ -723,8 +775,18 @@ local function handle_normal(view, k, tok, shift)
 
   if handle_command(view, char, count) then return true end
 
+  -- Vim has declined it and so has the registry: this key belongs to somebody
+  -- else. That is the fall-through the host needs, and it only exists because
+  -- `handle_command` answers false for a key it did not match.
   if registry.call_key(tok, view) then return true end
 
+  -- One last distinction, and it is the whole of the named-key bug. A key the
+  -- host *prints* is ours to swallow — vim beeps at a letter it does not know,
+  -- and swallowing it is what the beep is made of. A key the host reports *by
+  -- name* is not ours at all: `pageup` is a page, `f3` is a function key,
+  -- `delete` is whatever the host bound it to. Answering "handled" for one of
+  -- those is how Home and PageUp came to do nothing at all, silently, in normal
+  -- mode only.
   return #char == 1
 end
 
@@ -797,18 +859,29 @@ function M.handle_key(k)
   local shift = keymap.modkeys.shift
   local tok   = token_for(k, shift)
 
-  -- An arrow is `hjkl`, but only while the document is the focused view.
+  -- A key the host reports by name is the vim motion it means, but only while
+  -- the document is the focused view.
   --
   -- The gate is the whole point. The tree, the project-search list and the
-  -- autocomplete popup all bind these same four names, and they want them
-  -- exactly as the host spells them; translating here without it would take
-  -- arrows away from every one of them the moment a document was open
+  -- autocomplete popup all bind these same names, and they want them exactly as
+  -- the host spells them; translating here without it would take `space` and
+  -- the arrows away from every one of them the moment a document was open
   -- somewhere. Same idiom as treeview's `when_focused`.
   --
   -- `tok` is built above this line on purpose: the registry is asked about
-  -- `"up"`, not about the `k` it became, so an integration that later wants to
-  -- claim an arrow still can.
-  if view and core.active_view == view then k = ARROWS[k] or k end
+  -- `"up"` and about `"home"`, not about the key they became, so an integration
+  -- that later wants to claim one still can.
+  if view and core.active_view == view then
+    local named = NAMED[k]
+    if named then
+      -- The shift flag goes with the name, and that is the whole reason it is
+      -- cleared rather than kept. `shift+left` is the host's "extend the
+      -- selection", and in vim that is what a plain `h` already does in visual
+      -- mode; left set, the same key would become `H` and throw the caret to the
+      -- top of the window, and `shift+home` would become `)`.
+      k, shift = named, false
+    end
+  end
 
   -- Shift and `;` is `:`, the way it is in every terminal. Checked against the
   -- base key rather than the character, because `;` reaches here as the base key
