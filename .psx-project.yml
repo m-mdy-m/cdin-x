@@ -5,7 +5,7 @@ email: bitsgenix@gmail.com
 github_user: m-mdy-m
 repo_name: cdin-x
 license: MIT
-version: "0.1.0"
+version: "0.2.0"
 language: lua
 lua_version: "5.4"
 tags:
@@ -15,4 +15,4 @@ tags:
 ci:
   provider: github
   validate_command: "make validate"
-  quality_command: "make quality"
+  # There is no make quality; validate is the only gate.

@@ -4,8 +4,8 @@
 # Global owners
 *                   @m-mdy-m
 
-# Core runtime
-core/               @m-mdy-m
+# Extension manager (was: core/ before 0.1.0)
+cdinx/              @m-mdy-m
 
 # Extension catalog
 X/                  @m-mdy-m
