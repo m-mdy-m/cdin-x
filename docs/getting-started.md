@@ -44,25 +44,35 @@ Three directories land in the site:
 <site>/plugins/cdin-x/   one file, the entry point cdin's loader finds
 ```
 
-A fourth thing is already there and does not come from here: **vim**. It is the
-one plugin a cdin build cannot start without, so it is bundled into the editor
-itself rather than installed next to everything else. It's already loaded by the
-time any site plugin runs.
+Two things are already there and do not come from here: **vim** and the
+**extension manager**. Both are marked `essential`, so a cdin build bundles them
+into the editor itself rather than installing them next to everything else. vim
+is already loaded by the time any site plugin runs; the manager is what opens
+the extension panel.
 
 That's the whole split. cdin owns the editor and the mandatory set; this
 repository owns the rest, and nothing in a cdin checkout ever points at it.
 
 ## First launch
 
-Start cdin and press <kbd>shift</kbd>+<kbd>M</kbd>. That's the manager.
+Start cdin and press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>M</kbd>. That's the
+manager. It is bundled with the editor, so it is there before you install
+anything.
 
-<kbd>J</kbd> and <kbd>K</kbd> move, <kbd>Space</kbd> toggles, <kbd>Enter</kbd>
-opens the plugin, <kbd>U</kbd> uninstalls, <kbd>R</kbd> opens its README,
-<kbd>Ctrl</kbd>+<kbd>R</kbd> refreshes the catalog, <kbd>Esc</kbd> closes.
+<kbd>J</kbd> and <kbd>K</kbd> move, <kbd>Space</kbd> or <kbd>Enter</kbd> toggles
+the extension under the cursor, <kbd>I</kbd> installs, <kbd>U</kbd> removes,
+<kbd>D</kbd> opens its details, <kbd>R</kbd> rescans, <kbd>?</kbd> logs where the
+catalog came from, <kbd>Ctrl</kbd>+<kbd>R</kbd> re-downloads it, and
+<kbd>Esc</kbd> closes. <kbd>/</kbd> or <kbd>Ctrl</kbd>+<kbd>F</kbd> searches.
 
-If you'd rather not learn a second set of keys, the same panel is a vim menu
-section: press <kbd>m</kbd>, then <kbd>X</kbd>. And if the command palette is
-what you live in, `cdin-x:menu` is in there under its own name.
+If `vim-plugin-manager` is installed, <kbd>Shift</kbd>+<kbd>M</kbd> does the same
+thing in vim normal mode. It is **not** bound globally on purpose: a global
+<kbd>Shift</kbd>+<kbd>M</kbd> is also how you type a capital `M`, and it would
+open the panel from insert mode and from the <kbd>:</kbd> prompt.
+
+In vim mode the menu has an `X` entry under <kbd>m</kbd> — but that one opens the
+manager's *palette* menu, not the panel. And `cdin-x:menu` is in the command
+palette under its own name.
 
 ## Your first plugin
 
