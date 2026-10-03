@@ -6,8 +6,17 @@ Splits, focus movement, and resizing.
 | --- | --- |
 | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>\</kbd> | `window:split` — split horizontally |
 | <kbd>Ctrl</kbd>+<kbd>\</kbd> | `window:vsplit` — split vertically |
-| <kbd>Alt</kbd>+<kbd>W</kbd> | next pane |
-| <kbd>Alt</kbd>+<kbd>P</kbd> | previous pane |
+| <kbd>Alt</kbd>+<kbd>W</kbd> | next pane (wraps) |
+| <kbd>Alt</kbd>+<kbd>P</kbd> | back to the pane you were in before this one |
+
+<kbd>Alt</kbd>+<kbd>P</kbd> is `window:focus-prev-window`, which jumps to
+`core.last_active_view`. It is **not** the order-based `window:focus-prev`, which
+has no key at all — two different meanings of "previous", kept as two commands.
+
+Eleven more commands have no key, deliberately: `window:new`, `window:vnew`,
+`window:split-open`, `window:vsplit-open`, `window:close-force`,
+`window:close-all-views`, `window:focus-prev`, `window:focus-first`,
+`window:focus-last`, `window:maximize-width`, `window:maximize-height`.
 | <kbd>Alt</kbd>+<kbd>H</kbd> <kbd>J</kbd> <kbd>K</kbd> <kbd>L</kbd> | left, down, up, right |
 | <kbd>Alt</kbd>+<kbd>←</kbd> / <kbd>→</kbd> | narrower / wider |
 | <kbd>Alt</kbd>+<kbd>↑</kbd> / <kbd>↓</kbd> | shorter / taller |
@@ -75,26 +84,40 @@ window/manager.lua          the public surface
 window/manager/ops.lua      split, close, resize
 window/manager/focus.lua    moving between panes
 window/manager/context.lua  which pane, and what is in it
-window/manager/teardown.lua closing, and refusing to close the last one
+window/manager/teardown.lua closing, without the prompt
 ```
 
 **A split is a view in the root tree, not a window in the OS sense.** The
 renderer has one window; a split is the root view's node tree gaining a
 sibling. That is why `window:close` on the last pane does not close the
-application — the root cannot lose its only child, and `teardown.lua` is where
-that is enforced.
+application — and the guard for it is in `manager/ops.lua`, not `teardown.lua`:
+it counts the leaves and logs `window: only one window open`.
 
-**Focus is remembered per direction, not per order.** `focus-left` from the
-leftmost pane does nothing, and `focus-right` wraps. Which pane is "left" is
-derived from the tree, so a split made in an unusual place still has a correct
-answer. `focus-prev` and `focus-prev-window` are different commands because
-there are two reasonable meanings of "previous" and picking one silently would
-be worse than having both.
+**`window:close` and `window:close-force` are different code paths, not the
+same path with a flag.** `close` delegates to the host's
+`node:close_active_view`, which is what prompts about unsaved changes.
+`close-force` calls this plugin's own `teardown.close_active_view`, which does
+not prompt at all.
 
-**`maximize-width` and `maximize-height` are not `only`.** They resize the
-pane and leave the others on screen, collapsed to nothing. A key that appears
-to close everything when it means "make this big" is the kind of surprise that
-costs you an unsaved buffer.
+**`window:close-all-views` discards unsaved changes and never asks.** The
+command's own comment claims "the caller confirms first"; no caller does. It
+loops up to a thousand times, installs the host's empty view at the end, and
+garbage-collects unreferenced documents. `window:close-all-views` is not a key,
+which is the only thing keeping that survivable.
+
+**Focus is geometric, and it does not wrap.** `focus-left` from the leftmost
+pane does nothing, and neither does `focus-right` from the rightmost — adjacency
+needs the panes to overlap on the cross axis by half, with a two-cell tolerance.
+Only `focus-next` and `focus-prev` wrap, because they walk the leaf list by
+index. `focus-prev` and `focus-prev-window` are different commands for a real
+reason: the first is order-based, the second jumps to `core.last_active_view`.
+
+**`maximize-width` and `maximize-height` are not `only`.** They push the divider
+to `0.9` (or `0.1`), so the other pane keeps a tenth of the axis — visible, not
+collapsed. They are also the only resize paths that **emit no event**: every
+other one calls the same `emit` that `context.lua` implements as
+`core.redraw = true`, so the two arguments are discarded and nothing is actually
+listened to anyway.
 
 **The <kbd>Ctrl</kbd>+<kbd>W</kbd> table is a cdin command name per character.**
 Not a function. So a keymap entry in `~/.config/cdin/user/init.lua` can rebind
@@ -110,4 +133,4 @@ is only one table.
 | `manager/ops.lua` | split, close, resize |
 | `manager/focus.lua` | focus movement |
 | `manager/context.lua` | which pane, and what is in it |
-| `manager/teardown.lua` | closing, and the last-pane rule |
+| `manager/teardown.lua` | closing without a prompt |

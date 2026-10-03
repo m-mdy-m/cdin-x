@@ -18,8 +18,9 @@ main  -            branch, no upstream
 ```
 
 and nothing at all when you are not in a repository, or when the plugin is not
-installed. There is no "git is missing" state, because there is no code path
-that can fail — the status bar asks a hook, and with no hook it draws nothing.
+installed, or when nothing started the polling loop — see the last section. There
+is no "git is missing" state, because the status bar asks a hook, and with no
+hook it draws nothing.
 
 | reading | means |
 | --- | --- |
@@ -31,7 +32,9 @@ that can fail — the status bar asks a hook, and with no hook it draws nothing.
 | `!2` | two files in conflict |
 
 The counts come from `git status --porcelain`, not from parsing human output,
-which is why an unusual filename or a path with a newline does not confuse it.
+which is why an unusual filename does not confuse it. A name containing a
+newline, a tab or a quote will: the parser strips git's quoting but does not
+decode the escapes inside it.
 
 ## Using it from a menu
 
@@ -61,23 +64,29 @@ local git = require "X.core.git.api"
 
 | what | what it is |
 | --- | --- |
-| `git.exe(cmd)` | run a command, return output and success |
-| `git.exe_cwd(cmd, dir)` | the same, in a directory |
-| `git.popen(cmd)` | a streaming handle, for something long |
+| `git.exe()` | the path to the git executable, or `false` if it is not installed |
+| `git.exe_cwd()` | the same, prefixed with `-C "<project dir>"` |
+| `git.popen(cmd)` | run `cmd` and return its **captured output**, or `nil` |
 | `git.normalize_path(p)` | a path the way git writes it |
 | `git.IS_WIN` | the platform, so you don't have to ask `core` |
 | `git.status` | the live status table (below) |
 | `git.status.is_ignored(path)` | is this path in `.gitignore` |
 | `git.status.refresh_ignored_now()` | re-read `.gitignore` |
 | `git.recipes` | the shared shell command strings |
-| `git.sync_registry` | clone or pull the extension catalog |
+
+`exe()` and `exe_cwd()` take **no arguments** — they answer "where is git" and
+"where is git, told about this project", not "run this". They are the two calls a
+plugin needs before it can build a command line out of `git.recipes`.
+
+`popen()` reads the whole stream and closes it, so it returns a string, not a
+handle. It is not for something long-running.
 
 `git.status` is a live table, not a function — it is polled on a coroutine
 every `config.git_update_rate` seconds (2 by default) and the status bar reads
 whatever is in it:
 
 ```lua
-git.status.branch       -- "main", or "(detached)" with a hash, or nil
+git.status.branch       -- "main", or "(" .. short_hash .. ")" when detached, or nil
 git.status.has_remote   -- an upstream tracking branch exists
 git.status.ahead        -- commits ahead
 git.status.behind       -- commits behind
@@ -85,7 +94,26 @@ git.status.staged       -- files staged
 git.status.unstaged     -- files changed or untracked
 git.status.conflicts    -- files in conflict
 git.status.repo_dirty   -- anything at all
+git.status.root         -- the repository toplevel
+git.status.state        -- "rebase" | "merge" | "cherry" | "bisect", or nil
 ```
+
+A detached HEAD renders as `(1a2b3c)` — the short hash in parentheses. It is not
+the literal word `detached`, and a comment in `status.lua` claiming otherwise is
+wrong.
+
+`git.status.state` is probed out of `.git/` directly: `rebase-merge`,
+`rebase-apply`, `MERGE_HEAD`, `CHERRY_PICK_HEAD`, `BISECT_LOG`. It is nil in a
+clean tree.
+
+Also on the table, and used by integrations: `git.status.get_status(item)`,
+`git.status.get_entry(item)`, `git.status.refresh()`, `git.status.thread()`, and
+the raw per-file map `git.status.status`.
+
+**Finding git is cached, including a failure.** On Windows the search is
+`where.exe git`, then a preference for `…\cmd\git.exe`, then five hard-coded
+paths. The result — or `false` — is cached for the life of the process, with no
+invalidation. Installing git while the editor is open does not fix it.
 
 ## The recipes
 
@@ -135,26 +163,49 @@ special case for a capability it does not own.
 flag so a later enable registers again. That is a smaller promise than the rest
 of the catalog makes, and it is honest about it.
 
-**The second hook is the registry syncer.** Fetching the plugin catalog is a git
-operation, so it lives here. `cdinx` needs to clone and pull but refuses to know
-that git exists, so it asks for a syncer at bootstrap. With this plugin absent,
-**Refresh Catalog** reports that it is unavailable instead of quietly doing
-nothing — which is the behaviour you want from an operation that needs the
-network.
+**This plugin starts no polling thread.** `core.add_thread(git.status.thread)`
+appears in exactly one place in the catalog, and it is
+[`git-treeview`](../../X/integration/git-treeview) — not here. So installing
+`git` on its own registers a provider and leaves `git.status.branch` nil until
+the host's `register_vcs_provider` hook decides to start the loop for it. That
+is the host's half of the contract, and the page should not have implied
+otherwise.
+
+**Registration is guarded, and the guard is silent.** `register()` only does
+anything `if core.register_vcs_provider` exists. On a host without that hook it
+is a no-op with no message — the plugin looks loaded and does nothing.
+
+**There is no second hook any more.** The registry syncer that used to live
+here — `sync_registry`, which cloned and pulled the catalog — is gone. The
+extension catalog is not fetched with git: `cdinx` downloads
+`X/manifest.lua` and the files of the one extension being installed over plain
+HTTPS. `cdinx/manager/registry.lua` still accepts an injected syncer and prefers
+one if it is registered, but nothing in `X/` registers one.
 
 **Status polling is a coroutine.** It sleeps `config.git_update_rate` between
 passes and never blocks the frame loop. `is_ignored` is synchronous because the
 file tree has to decide whether to draw an entry *now*, and it answers from a
 cache that `refresh_ignored_now` updates.
 
+**Porcelain is parsed, not decoded.** The parser strips git's quotes but does not
+unescape `\n`, `\t` or `\"` inside them, so a filename containing one of those is
+stored wrong. `core.project_files` limits the damage — such a file will not be in
+the list anyway — but the claim that "a path with a newline does not confuse it"
+was too strong.
+
 ## Files
 
 | file | holds |
 | --- | --- |
-| `api.lua` | the public surface, and the two host hooks |
+| `api.lua` | the public surface, and the host's vcs hook |
 | `exec.lua` | running processes, platform differences |
 | `status.lua` | the status table, polling, `.gitignore` |
 | `recipes.lua` | the shared command strings |
-| `manager/ops.lua` | cloning and pulling the catalog |
-| `manager/find-git.lua` | finding the git executable |
+| `manager/ops.lua` | `exe`, `exe_cwd`, `popen` — and three dead helpers |
+| `manager/find-git.lua` | finding the git executable, cached |
 | `manager/utils.lua` | shared helpers |
+
+`manager/ops.lua` still carries the banner comment for the deleted registry
+fetcher, and three locals — `quote`, `succeeded`, `run` — that nothing calls.
+`exec.exe_with_dir` exists and is not re-exported by `api.lua`, so it is
+unreachable from the documented surface.

@@ -1,6 +1,7 @@
 # tab
 
-Tabs across the top. Open, switch, move, close.
+Tabs. Open, switch, move, close. There is no tab bar — a `[2/5]` counter
+appears on the right of the status bar once you have two or more tabs.
 
 | key | does |
 | --- | --- |
@@ -15,9 +16,24 @@ Everything else is a command: `tab:close-all`, `tab:close-force`,
 `tab:close-others`, `tab:duplicate`, `tab:first`, `tab:last`, `tab:pin`,
 `tab:rename`, `tab:reopen-closed`.
 
-`tab:pin` keeps a tab from being taken by `close-others`. `tab:reopen-closed`
-brings back the last one you closed, which is a different thing from
-`tab:duplicate` and the pair covers most of what people actually want.
+**`tab:pin` only blocks `tab:close`.** `close-others` and `close-all` pass
+`force = true`, and the pin guard tests `pinned and not force` — so pinning is
+not a "keep this one" flag and it will not save a tab from either of those.
+
+**`tab:close-all` cannot close the last tab.** The last-tab check runs before
+`force` is consulted, so it always leaves exactly one and logs
+`tab: cannot close the last tab`.
+
+**`tab:reopen-closed` is lossy.** It restores the name and the views, but not
+`pinned`, and it re-inserts at the *end* of the order rather than the position
+the tab had. The closed stack holds twenty.
+
+**`tab:duplicate` re-opens the file set, not the layout.** It walks the node
+tree by hand to collect filenames and reopens each one, so a split arrangement
+does not come back — only the files.
+
+`tab:reopen-closed` and `tab:duplicate` are a different thing from each other,
+and the pair covers most of what people actually want.
 
 ## In vim mode
 
@@ -42,14 +58,21 @@ its job.
 
 ## Restoring tabs across a restart
 
-With `tab-session` installed, `tab:session-save` records the open tabs, and the
-next launch offers to bring them back. It is a separate plugin because session
-persistence is a separate concern from having tabs: some people want their
-tabs and some want a clean slate every morning, and it should not be a
-preference buried in the tab plugin's config.
+With `tab-session` installed, `tab:session-save` records the open tabs. It is a
+separate plugin because session persistence is a separate concern from having
+tabs: some people want their tabs and some want a clean slate every morning, and
+it should not be a preference buried in the tab plugin's config.
 
-`session` is what actually writes the file, and it writes the theme and the
-recent-files list too. Uninstall `session` and tab restoration stops with it.
+**Restoring is off by default.** `config.tab_session_restore` defaults to
+`false`, so nothing comes back until you set it. When it is on, it restores
+**files only** — not the split layout — and it does so silently in a thread on
+launch, with no prompt.
+
+`session` does **not** write this file. `tab-session` has its own writer, its own
+path (`<data>/cdin/tab_session.lua`, hard-coded rather than derived from
+`config.data_dir`), and its own `on_quit` subscription. What it takes from
+`session` is the quit seam — and with `session` uninstalled, tab saving stops
+even though the integration is still installed.
 
 ## How it works
 
@@ -57,9 +80,19 @@ recent-files list too. Uninstall `session` and tab restoration stops with it.
 tab/manager.lua        the public surface
 tab/manager/index.lua  the ordered list, and which is active
 tab/manager/operation.lua  open, close, move, rename, pin
-tab/impl.lua           the bar
+tab/impl.lua           the status-bar counter, and registration
 tab/commands.lua, keymap.lua   registration only
 ```
+
+**The counter is a patch on `StatusView.get_items`, not a widget.** `impl.lua`
+saves the original, appends a dim `[n/total]` cluster to the right of the status
+bar when there are two or more tabs, and puts the original back on unload. It is
+not a tab bar and it draws nothing else.
+
+**`manager/index.lua` reaches three levels into the host's node tree** —
+`root.b.a`, then `.b` and `.a` — looking for an unlocked pane to restore a tab
+into. That is this plugin's tightest coupling to the host's layout and the most
+likely thing to break if the host restructures; nothing in the catalog checks it.
 
 **Tabs are an index over view trees, not copies of anything.** Switching tabs
 moves the root view's active child; it does not rebuild anything. That is why
@@ -83,10 +116,15 @@ the tab plugin.** `registry.call_gmap("gt", n)` passes the count through, and
 `vim-tab` decides what to do with it. Vim core never learns that `t` means
 "tab"; it learns that `g` starts a sequence and hands over the rest.
 
-**`tab:close-force` exists and is not bound to anything.** It is the command
-you reach for when `tab:close` refuses because a document is dirty. Having it
-findable but unbound is the compromise — a key would be a footgun, and its
-absence from the palette would be worse.
+**`tab:close` never refuses because of a dirty document.** This plugin does not
+inspect documents at all. Its only refusal is the pin message
+`tab: '<name>' is pinned — unpin first or use force`. So `tab:close-force` is not
+"close the dirty one anyway" — it is the same command with the pin check
+skipped, and it is unbound because there is nothing else it would be for.
+
+**There is a one-frame window before tabs exist.** `bootstrap()` runs in a thread
+after a `coroutine.yield(0)`, so for one frame `tab_order` is empty and every
+navigation command is a silent no-op.
 
 ## Files
 
@@ -95,6 +133,6 @@ absence from the palette would be worse.
 | `manager.lua` | the public surface |
 | `manager/index.lua` | the ordered list, and the active one |
 | `manager/operation.lua` | open, close, move, rename, pin |
-| `impl.lua` | the tab bar |
+| `impl.lua` | the status-bar counter, and registration |
 | `commands.lua` | the `tab:*` names |
 | `keymap.lua` | the keys above |

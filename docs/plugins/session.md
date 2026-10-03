@@ -8,16 +8,38 @@ and the chosen theme.
 | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd> | `session:open-recent` |
 | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd> | `session:open-recent-dirs` |
 | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>S</kbd> | `session:save` |
-| `session:clear` | forget the recent lists |
-| `session:show-info` | where the session file is, and what is in it |
+
+Two more have no key, which is deliberate: `session:clear` forgets the recent
+lists, and `session:show-info` reports what is in the file.
 
 `session:save` is there for the case where you know you are about to lose
 something — a crash, a forced quit — and it is bound to a chord you will not
 press by accident. You do not normally need it: the session is written on a
 clean exit anyway.
 
-`session:show-info` is worth knowing about when something looks wrong. It prints
-the file's path and its size, which answers "is it writing at all" in one step.
+**`session:show-info` does not do what it says.** It logs two counts and a path
+— and the path is `nil`, because `api.info()` returns `Sys.path` while
+`manager/sys.lua` defines `path` as a *function* and never assigns the field.
+So the line reads `session: 12 files, 3 dirs — nil`. There is no size anywhere
+in this plugin. If you want to know whether it is writing, look at the file.
+
+Note that <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd> is also
+`treeview:refresh-key`. Both bind it with a bare `keymap.add`, so whichever
+loaded last wins while the other's predicate fails.
+
+## Config
+
+| key | default | what it does |
+| --- | --- | --- |
+| `config.session_max_recent` | `10` | how many recent files and directories to keep |
+| `config.session_restore` | `false` | reopen the last session's files on launch |
+| `config.session_save_on_quit` | `true` | write the file when you quit |
+| `config.session_restore_dir` | `true` | restore the last directory (read by the host) |
+| `config.session_restore_theme` | `true` | restore the chosen theme (read by the host) |
+
+All five are set only when they are `nil`, so a value in your own `init.lua`
+wins. **`session_restore` is off by default** — nothing comes back on its own
+until you turn it on.
 
 ## Saving on exit
 
@@ -58,7 +80,6 @@ to hit it does not spend an hour on it.
 session/api.lua                    the state, its operations, and the quit listeners
 session/commands.lua, keymap.lua   registration only
 session/manager/sys.lua            reading and writing the file
-session/manager/session-loader.lua applying what was read
 ```
 
 **The state is published as `core.session`.** Other plugins read it rather than
@@ -66,13 +87,21 @@ opening the file themselves. Two readers of the same file would be two answers
 to "what were the recent files", and only one of them would be right after a
 write.
 
-**The file is written on exit and on demand, never on every change.** Recent
+**The file is written on exit, on demand, and on every theme change.** Recent
 files are a convenience, not a log; writing on every open would mean a disk
-write per keystroke-driven action, for a list nobody reads that often.
+write per keystroke-driven action, for a list nobody reads that often. The
+exception is `set_theme`, which writes immediately so a crash cannot lose the
+choice — so this is "on exit, on demand, and whenever you pick a theme", not
+"only on exit".
+
+**`session:clear` forgets more than the recent lists.** It also drops the last
+directory and the recorded theme, then writes the file.
 
 **Loading is best-effort and silent.** A missing or corrupt session file means
 an empty recent list, not an error at startup. A convenience feature that can
-prevent the editor from opening has to be the thing that gives way.
+prevent the editor from opening has to be the thing that gives way. Note that
+this plugin never reads its own file directly — it goes through the host's
+pre-boot reader, and `manager/session-loader.lua` is not on that path.
 
 ## Files
 
@@ -81,5 +110,5 @@ prevent the editor from opening has to be the thing that gives way.
 | `api.lua` | the state, its operations, `on_quit` / `off_quit` |
 | `commands.lua` | the `session:*` names |
 | `keymap.lua` | the three keys above |
-| `manager/sys.lua` | reading and writing |
-| `manager/session-loader.lua` | applying what was read |
+| `manager/sys.lua` | reading and writing the file itself |
+| `manager/session-loader.lua` | **not used by this plugin** — its only caller is `tab-session`, which reads the tab file |

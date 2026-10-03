@@ -27,11 +27,19 @@ labelled "Git: Tab" and also one whose hint says "git". It is not fuzzy —
 `gtb` will not find "Git: Tab", because those letters are not contiguous. If
 you want subsequence matching, that is the palette's business, not this one's.
 
-**A single letter runs an entry directly.** Every entry has a letter in its
-left column, and if what you typed is exactly one character and an entry claims
-it, that entry runs — the filter is not consulted. This is why sections pick
-letters carefully, and why a single character is a shortcut rather than a
-one-letter search.
+**A single letter runs an entry directly — and it is the *first* character, not
+the whole input.** Every entry has a letter in its left column, and the submit
+handler looks up `text:sub(1,1)`. So `g` runs the `g` entry — and so does `git`,
+`go`, or anything else beginning with `g`. The rest of what you typed is
+discarded and the filter is never consulted.
+
+The live filter has the same short-circuit, and it is worse: after you type one
+character that some entry claims, the list collapses to that entry and stops
+narrowing. Typing `gits` shows you the `g` entry and nothing else.
+
+This is why sections pick letters carefully. It is also the one place where this
+menu behaves differently from the [palette](palette.md), which is fuzzy
+throughout and never short-circuits on a letter.
 
 ## What is in the menu
 
@@ -39,18 +47,24 @@ one-letter search.
 
 | section | what it does |
 | --- | --- |
-| Files | new, open, save, close, recent files |
-| Navigate | the file finder and the folder prompt |
-| Build | run a command, `make`, a custom build |
-| Shell | run a shell command, open a terminal |
+| Files | new file, new directory, open, rename, copy, move, delete |
+| Navigate | change directory, up one level, current directory, working directory |
+| Build | `make`, `make test` |
+| Shell | a custom command, the environment, network info |
 
-Two more come from other integrations, and they are the clearest example of why
+Four more come from other integrations, and they are the clearest example of why
 this plugin exists as a separate thing:
 
-| section | from | what it does |
-| --- | --- | --- |
-| Git | `vim-git` | status, log, diff, add, commit, push, pull, branches |
-| CDIN-X | `vim-plugin-manager` | the extension manager |
+| order | section | from | what it does |
+| --- | --- | --- | --- |
+| 20 | Tree | `vim-treeview` | refresh, and jump into the file tree |
+| 30 | Git | `vim-git` | status, log, diff, add, commit, push, pull, branches |
+| 40 | Search | `vim-search` | find, replace, project search |
+| 80 | CDIN-X | `vim-plugin-manager` | the extension manager |
+
+`vim-treeview` also registers the menu's only context provider, at priority
+200 — which is why the title shows the tree's state rather than
+`vim-menu`'s own idea of it.
 
 `git` is a whole capability — process discovery, status, ignore rules — and it
 knows nothing about menus. `vim-git` is the one file that knows both. Uninstall
@@ -143,6 +157,11 @@ menu.open("vim.main", { label = "something else" })   -- with a context
 
 ## How it works
 
+**This plugin registers no commands and binds no keys.** Every keystroke in the
+table above belongs to `core.command_view`, the host's prompt. `menu` is six
+functions and a registry; if you have `vim-menu` you get the <kbd>M</kbd>
+binding from that integration, not from here.
+
 **A menu is a name and a lookup, not a thing.** `define` puts a spec in a table
 keyed by a string; `open(name)` looks it up and runs it. Nothing holds a
 reference to a menu, which is why a plugin can extend a menu another plugin
@@ -161,13 +180,41 @@ knows what is in the other.
 
 **The prompt is `core.command_view`.** Not a widget of its own — the same
 prompt the command palette uses, which is why the keystrokes are the same and
-why the argument can be either a typed string or a chosen item. The title says
-so: it opens as `Menu  (key / ↑↓ / Tab)`.
+why the argument can be either a typed string or a chosen item. The title is the
+menu's own `title` (or its name), the context's label when there is one, and
+then `(key / ↑↓ / Tab)`.
 
-**Entry order in the list is registration order, and it is not stable across
-installs.** Sections sort themselves, but the sections themselves come out of a
-`pairs()` walk. If the order of two sections matters to you, that is what the
-`order` argument is for.
+**Section order is `order`, then registration order.** Providers sort ascending
+by `order`, and ties break on the sequence number they were registered with, so
+once two sections have different `order` values the list is deterministic.
+`pairs()` only reorders providers that tie — which is the case to avoid rather
+than one to document.
+
+**Ties break the two ways round.** `extend` breaks on the *lower* registration
+number, so the first section registered comes first. `set_context_provider`
+breaks on the *higher* one, so the most recently registered provider wins. Both
+are one-line comparisons and neither is commented where you would want it.
+
+**The filter matches the rendered row, not the model.** An entry is drawn as
+`[x] label` with a `├─ ` / `└─ ` prefix and section headers as `── Header ──`,
+and the substring test runs against that string. So `[`, `]`, `─` and `└` are
+searchable characters, and a section header matches on its own text.
+
+**Two entries with the same letter disagree.** The submit path builds its key
+table by assignment, so the **last** one wins; the filter scans in order and
+returns the **first**. Press <kbd>Enter</kbd> and you get one entry, keep typing
+and you see the other.
+
+**`define` is destructive.** It replaces the whole entry for a name, dropping
+every provider and context registered against it. Re-defining `vim.main` after
+other integrations have extended it silently removes their sections; nothing
+warns.
+
+**Unload is one line.** It sets `core.menu = nil` and removes no section,
+because the plugin keeps no registry of who extended what. If you care that
+your sections disappear, your integration's own `unload()` has to do it — and
+`vim-menu`'s does not, which is why uninstalling it can leave a stale `vim.main`
+in the table.
 
 ## Files
 

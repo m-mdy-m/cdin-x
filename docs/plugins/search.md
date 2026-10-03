@@ -21,9 +21,9 @@ The search is a **plain substring, case-insensitive, and it wraps** — reaching
 the end continues at the top. Two things follow from that, and both are worth
 knowing before you go looking for the option:
 
-- There is no case-sensitive mode. `no_case = true` is set on both search
-  commands and nothing reads it back, so a search for `error` will also find
-  `Error`. Matching a case exactly is not something this plugin offers.
+- There is no case-sensitive mode. `no_case = true` is passed to the host's
+  `core.doc.search` on both commands, and nothing in this plugin reads it back;
+  matching a case exactly is not something the plugin itself offers.
 - There is no prefix syntax either — no `/` for literal, no `c/` for
   case-sensitive, no `r/` for regex. What you type is what is searched, and if
   you want a Lua pattern instead of a substring you ask for it with a
@@ -40,17 +40,25 @@ and searches for it literally, which is the safe reading.
 
 ## Replacing
 
-The prompt switches to replace once you have a search. In the palette the
-commands are:
+None of the replace commands has a key, and none of them continues a search you
+already have. Each opens its own two prompts — what to find, then what to put
+there — and then rewrites the **whole document**, not the match you were
+looking at. There is no "replace this one" and no "replace all, asking".
 
 | command | does |
 | --- | --- |
-| `find-replace:find-pattern` | search for what is under the cursor |
-| `find-replace:replace` | replace the current match |
-| `find-replace:replace-pattern` | replace using the last pattern |
-| `find-replace:replace-symbol` | replace every match in the document |
+| `find-replace:replace` | every literal instance of the text, in the document |
+| `find-replace:replace-pattern` | every instance of a **Lua pattern** you type |
+| `find-replace:replace-symbol` | every symbol matching `config.symbol_pattern` whose text equals what you typed |
 | `find-replace:select-next` | next match, without opening the prompt |
 | `find-replace:repeat-find` / `previous-find` | walk the matches |
+
+The old text is escaped before `gsub` in `replace`, so a `%` or a `-` in what
+you search for is literal. `replace-pattern` does not escape, because the whole
+point is that it is a pattern. `replace-symbol` matches on
+`config.symbol_pattern` — the host's own identifier pattern, the same one the
+treeview and autocomplete use — and replaces only the captures that equal your
+input, so renaming one function does not rename the one that shares its prefix.
 
 ## Across the project
 
@@ -63,13 +71,19 @@ commands are:
 
 | command | does |
 | --- | --- |
-| `project-search:find-pattern` | search for what is under the cursor |
+| `project-search:find-pattern` | search the project for a **Lua pattern** |
 | `project-search:fuzzy-find` | fuzzy rather than substring |
 | `project-search:open-selected` | open the highlighted file, at the line |
 
-The results view is a list of `file:line` with the matching text, and opening
-one puts the cursor on the match rather than at the top of the file — which is
-the only thing that makes a project-wide search worth having.
+The results view is a list of `file:line:col` with the matching text and 40
+characters of context, and opening one puts the cursor on the match rather than
+at the top of the file — which is the only thing that makes a project-wide
+search worth having.
+
+It searches exactly what the host's project scanner produced
+(`core.project_files`), so a file the scanner has not reached, or one hidden by
+[`treeview`](treeview.md)'s `ignore_files`, is not searched. The results pane is
+attached to whatever pane is focused when the search finishes.
 
 ## In vim mode
 
@@ -77,6 +91,9 @@ If `vim-search` is installed, <kbd>/</kbd> opens the same prompt, <kbd>n</kbd>
 repeats it, <kbd>N</kbd> repeats it backwards, and <kbd>*</kbd> searches for the
 word under the cursor. <kbd>*</kbd> with no word under the cursor deliberately
 does nothing rather than opening an empty search.
+
+It also adds a **Search** section to [the vim menu](menu.md), with its own
+single-letter keys.
 
 ## How it works
 
@@ -103,16 +120,35 @@ marked, so a document search and a project search that overlap do not fight
 over the same range — the second one replaces the first rather than painting
 over it.
 
-**The two keymaps that overlap are lists, not overrides.** <kbd>Ctrl</kbd>+<kbd>D</kbd>
-is bound to `{ "find-replace:select-next", "doc:select-word" }`: the first
-command whose predicate holds runs, and a predicate is what "there is a
-selected match" means. So the key belongs to search while searching and to the
+**The two keymaps that overlap are joined by prepending, not by lists.**
+<kbd>Ctrl</kbd>+<kbd>D</kbd> is bound by this plugin to the plain string
+`find-replace:select-next`. `keymap.add()` *prepends*, so the stroke now has two
+commands on it: search's first, and the core's `doc:select-word` still behind it.
+The first whose predicate holds runs — search's predicate is "this document has
+a selection" — so the key belongs to search while a match is selected and to the
 document otherwise, and neither plugin knows the other exists.
 
-**`doc:select-word` losing is not a bug.** `keymap.add(MAP, true)` replaces
-whatever the stroke had. That is the right call for a plugin that owns a key,
-and the wrong call for one that is adding to it — which is why the second
-argument is written down at every call site rather than defaulted.
+There is not a single list-valued binding in this plugin.
+
+**`keymap.add(MAP, true)` would break all of it.** The second argument
+replaces the *whole* chain for a stroke rather than joining it, and this plugin
+also binds <kbd>↑</kbd>, <kbd>↓</kbd> and <kbd>Enter</kbd> for the results view.
+Those are the document's cursor, the `:` prompt's submit, and the autocomplete
+popup's selection; overwriting them leaves a document with dead arrows and a
+command line with a dead <kbd>Enter</kbd>. The reason is written into the file
+next to the binding, because it is the kind of thing that gets "tidied up" once.
+
+## What clears what
+
+`find-replace:clear-highlight` calls `clear_doc_search`, which drops the
+highlights **and** the stored `last_fn`. `repeat-find` and `previous-find` are
+gated on that function existing, so <kbd>F4</kbd> and <kbd>R</kbd> go dead — and
+disappear from the palette — the moment you clear the highlight. That is one
+call, and it is not obvious from its name.
+
+The previous-find history is per-document and capped at 50 entries: switching
+documents discards it, and `find-replace:previous-find` then reports
+`No previous finds`.
 
 ## Files
 

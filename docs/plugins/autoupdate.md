@@ -6,11 +6,11 @@ dismiss it.
 | key | does |
 | --- | --- |
 | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>U</kbd> | `autoupdate:check` |
-| — | `autoupdate:skip-version` — never tell me about this version again |
+| — | `autoupdate:skip-version` — hide the badge for this session |
 
-`autoupdate:skip-version` has no key on purpose. It is a decision you make once
-per release, and a key you can hit by accident while dismissing a badge is a
-key that will be.
+`autoupdate:skip-version` has no key on purpose. It is a decision you make
+once, after you have read what the badge said, and there is nothing to hit by
+accident: the badge is three cells of text in the status bar, not a button.
 
 ## What it does and does not do
 
@@ -48,25 +48,58 @@ that must not block the frame loop.
 
 ```text
 autoupdate/manager/fetcher.lua   the network call
-autoupdate/manager/utils.lua     shared helpers
+autoupdate/manager/utils.lua     version comparison, platform split
 autoupdate/impl.lua              the badge and its dismissal
-autoupdate/commands.lua, keymap.lua   registration only
+autoupdate/commands.lua          registration only
+autoupdate/keymap.lua            registration only
 ```
 
-**The badge is a status pill, not a drawn thing.** It goes in through
-`core.register_status_pill(key, provider)`, like the vim mode indicator, and
-returns `nil` when there is nothing to say. So it disappears by returning nil —
-there is no "hide the pill" call to forget.
+**The badge is a wrapper around `StatusView.get_items`.** It saves the original,
+and splices three cells onto the *front* of the right-hand group — `style.text`,
+`" ↑ v<version> available "`, `style.dim`. It is not
+`core.register_status_pill`, which is the other way into that bar and the one the
+vim mode indicator uses; the difference matters on unload, below.
 
-**Dismissal is remembered per version, not per check.** Otherwise a badge you
-dismissed comes back on the next launch, and the only way to stop it is to
-uninstall the plugin — which is a much larger action than "not now".
+**So it is removed by putting the original back.** `impl.remove_badge()` assigns
+`StatusView.get_items = original_get_items` again, and `unload()` calls it. The
+alternative — a pill that returns `nil` when there is nothing to say — needs no
+uninstall at all, which is why the wrapper would have been the wrong shape if
+`remove_badge` did not exist. It does exist, and it is guarded by
+`badge_installed`, because the version of this that restored itself on dismissal
+stacked one wrapper per check: dismiss, check, dismiss, and each layer captured
+the layer below it, so nothing could be undone on the way out.
+
+**Dismissal is one boolean, for this session.** `impl.badge_dismissed` is set to
+`true` and read by the wrapper on every status-bar repaint. It is not keyed by
+version, and it is not written to disk — there is no state file and no
+`config` key, so the badge is back on the next launch and there is no way to
+un-dismiss it without restarting. A key named `skip-version` that skips exactly
+one version would need both; it does not have both, and the name is the thing
+that is wrong rather than the behaviour.
+
+**The badge text is fixed at the first check.** `install_badge(latest)` closes
+over the version it was handed, and the `badge_installed` guard means a second
+check that finds a *newer* release does not install a second badge. So if you
+check twice in a session and a build lands in between, the bar still shows the
+version from the first check. `autoupdate:check` still logs the newer one.
+
+**Two downloaders, and only one of them has a timeout.** POSIX shells out to
+`curl -sf --max-time 10` against
+`api.github.com/repos/m-mdy-m/cdin/releases/latest`; Windows uses
+`powershell -NoProfile -NonInteractive -Command (Invoke-WebRequest …)` with no
+timeout at all. Both go through `pcall(io.popen, …)` and empty output reads as
+failure, so the worst case on Windows is a check that takes as long as the
+network takes to give up.
+
+**Version comparison is integers only.** `version_gt` pulls every run of digits
+out of both strings and compares them numerically, so `1.2.0-alpha` compares
+equal to `1.2.0` — a pre-release of a newer version reads as the release
+itself, and is not offered.
 
 ## Files
 
 | file | holds |
 | --- | --- |
 | `manager/fetcher.lua` | the network call |
-| `manager/utils.lua` | shared helpers |
+| `manager/utils.lua` | version comparison, the platform split |
 | `impl.lua` | the badge, and its dismissal |
-| `commands.lua`, `keymap.lua` | registration |

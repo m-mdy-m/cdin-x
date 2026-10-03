@@ -48,9 +48,15 @@ one directory suggester.
 an array of *names*, so `entry.type` on one of its values is nil and every
 directory is filtered out — the prompt opens and offers nothing, with no error
 anywhere to say why. `fs.list` stats each entry and returns
-`{ name, type, size }`, which is what tells a directory from a file. The other
-two commands go through `common.path_suggest`, which reaches the same answer
-with its own stat per name.
+`{ name, type, size }`, which is what tells a directory from a file.
+`core:open-file` goes through `common.path_suggest`, which reaches the same
+answer with its own stat per name. `core:find-file` does neither — it fuzzy-matches
+the live `core.project_files` list and stats nothing at all.
+
+The three are not otherwise symmetric, and it shows when one of them fails.
+`core:open-file` and `core:open-folder` both clean the accepted path and report
+a specific error; `core:find-file` takes the suggestion raw and never checks that
+it exists, so a stale entry opens a file that is not there without a word.
 
 That is the kind of bug that costs an afternoon, and the reason it is written
 down at the call site as well as here.
