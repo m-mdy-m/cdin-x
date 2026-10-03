@@ -7,8 +7,6 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [Unreleased]
-
 ## [0.2.0] — 2026-10-03
 
 `manager` is now a plugin in the catalog and `essential = true`, so every cdin
