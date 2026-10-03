@@ -7,7 +7,510 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [Unreleased]
+## [0.2.0] — unreleased
+
+21 commits since `v0.1.0`. Two themes: **the manager stopped being a thing you
+run from outside the editor and became one you run from inside it**, and **vim
+mode stopped being a table of key names**.
+
+`manager` is now a plugin in the catalog and `essential = true`, so every cdin
+build carries an extension panel. The catalog is downloaded over plain HTTPS —
+one file to search, one file per install — and cdin-x is never cloned and git is
+never invoked.
+
+And `vimode/motions.lua` became a *rule* rather than a command name, which is
+what lets `dw`, `de` and `dj` be one definition instead of three that can
+disagree.
+
+### ⚠️ BREAKING CHANGES
+
+#### The essential set is two plugins, not one
+
+`X/core/manager` is marked `essential = true` alongside `vim`, with the `default`
+theme. `scripts/bundle.py` now produces:
+
+```
+X/core/vim/**            verbatim copy of the vim plugin, whole subtree
+X/core/manager/**        verbatim copy of the manager plugin
+cdinx/**                  the manager's own modules, via bundle_with
+plugins/vim.lua          return require("X.core.vim")
+plugins/manager.lua      return require("X.core.manager")
+themes/default/theme.lua the essential theme
+fonts/**                 5 fonts + 2 licences
+BUNDLE.lua               { plugins = { "manager", "vim" }, themes = { "default" } }
+```
+
+Everything the manager *offers* stays optional. What is not optional is the
+ability to ask what is installed and change it.
+
+#### Nothing is fetched with git any more
+
+0.1.0 shipped a syncer hook: `cdinx` refused to know git existed, the git
+plugin injected `M.sync_registry`, and **Refresh Catalog** reported the syncer
+unavailable when `git` was not installed. That whole path is gone.
+
+- `cdinx/manager/fetch.lua` (418 lines) is the only network code. It downloads
+  `X/manifest.lua` — one file, ~16 KiB — and then, for an install, exactly the
+  files that extension's manifest entry lists. `curl`, else `wget`, else
+  PowerShell on Windows. 120-second timeout, staging directory, and files are
+  only moved into place once the whole download succeeded.
+- `Manager.set_registry_syncer` still exists and still has **no callers**.
+  `registry.refresh` prefers an injected syncer and falls through to
+  `Fetch.sync`, so the HTTPS path is what runs.
+- `X/core/git/manager/ops.lua` lost `sync_registry` and kept the banner comment
+  and three dead locals (`quote`, `succeeded`, `run`).
+- **git is not required to install cdin-x extensions.** It is not used at all.
+
+New config: `config.registry_raw_url`, derived from `registry_url` by pattern,
+overridable directly; `CDIN_X_BRANCH` picks the branch.
+
+#### `config.extension_dir` gained an `X`
+
+`<data_home>/cdin/extensions` → `<data_home>/cdin/extensions/X`, because the
+store keeps each extension's category directory. The old path is preserved as
+`config.legacy_extension_dir`.
+
+#### `r` is vim's replace, and redo is <kbd>Ctrl</kbd>+<kbd>Y</kbd>
+
+`r` used to be redo here — a documented departure from vim, where `r` replaces
+the character under the caret. It now does what vim's does, and redo moved to
+<kbd>Ctrl</kbd>+<kbd>Y</kbd>.
+
+That is the editor's own redo stroke, so nothing was taken away from it — but if
+you have been pressing <kbd>r</kbd> to redo, use <kbd>Ctrl</kbd>+<kbd>Y</kbd>.
+Nothing else changed meaning.
+
+#### <kbd>Ctrl</kbd>+<kbd>D</kbd> is half a screen, not select-word
+
+Inside vim mode. Outside it, and on the panel and the finders, it is unchanged.
+<kbd>iw</kbd> is what the old binding did anyway.
+
+### Added
+
+- **`X/core/manager` — the extension panel, bundled into every build.**
+  `Ctrl+Shift+M` anywhere opens it. It groups by status first — *In the editor*,
+  *Installed*, *Available* — with categories inside the last two, which answers
+  "what is here, and what is mine" in that order. `Space`/`Enter`/`X` toggle,
+  `I` installs, `U` removes, `D` opens details, `R` rescans, `?` says where the
+  catalog came from, `Ctrl+R` re-downloads it, `[`/`]` resize, `/` or `Ctrl+F`
+  searches. The title bar carries the counts: `12 in editor  4 installed  29
+  available`.
+
+  `Shift+M` is deliberately **not** bound globally. It belongs to
+  `vim-plugin-manager` through vim's registry, so it is vim-normal-mode-only and
+  only when that integration is installed — a global `Shift+M` is also how you
+  type a capital `M`.
+
+- **`cdinx/manager/loader.lua` — the extension store is requireable.** Every
+  extension's own code names its modules by their place in the repository
+  (`require "X.core.treeview.treeview_impl"`), but the manager stores an
+  installed extension *without* the `X/` prefix, at
+  `<extension_dir>/core/treeview/init.lua`. Nothing told Lua about the mapping,
+  so the manager could download, place and `dofile` an extension and its first
+  `require` failed — for every installed extension with more than one file. This
+  is a `package.searchers` entry rather than a `package.path` line, because the
+  mapping is not a path template. It sits **after** the standard Lua searcher,
+  so the build's own copies still win.
+
+- **`bundle_with` in the bundler.** An essential plugin can declare paths that
+  have to travel with it:
+
+  ```lua
+  bundle_with = { "cdinx" },
+  ```
+
+  `manager` needs it — its code lives at the checkout root rather than under
+  `X/`, and a bundle that needs files the bundler did not know about is a build
+  whose editor starts and then does nothing. `bundle.py` reads it as text rather
+  than executing the manifest, clears the top-level directories it owns so a
+  deleted file does not survive in every later build, and **dies** on a path that
+  does not exist or that escapes the repository (`/…`, or a `..` segment).
+
+- **CI, which 0.1.0 did not have.** Six workflows under `.github/workflows/`:
+  `bundle.yml` (validate + bundle, twice into separate trees, compared whole),
+  `ci.yml` (manifest-is-current, install on Linux/macOS/Windows, and the required
+  -checks aggregator), `contract.yml` (checks out cdin and runs
+  `make test-workflows` against this checkout — the only check that can fail
+  because *another* repository changed, and the only failure a user hits),
+  `test-install.yml`, `release.yml`, `tag.yml`. Push, PR, weekly, manual.
+
+- **Panel search.** Substring over name, description and category first, fuzzy
+  over the name second, best match ranked to the top with the cursor on it. Never
+  the other way round — a fuzzy match that quietly returns things you did not ask
+  for is worse than a miss.
+
+- **`treeview:toggle-key`.** A command whose only job is to give one keystroke a
+  predicate, so <kbd>F2</kbd> can be a fallback chain entry instead of a
+  replacement.
+
+- **vim 0.3.0 — the editing grammar.** `di"`, `ci"`, `yi"`, `dw`, `db`, `de`,
+  `d$`, `di(`, `diw`, `dat`, and the rest of what makes a modal editor usable,
+  now work. They did not before, and the reason was structural rather than a
+  missing key.
+
+  `vimode/motions.lua` was a table of key → cdin command name. That can answer
+  "which command does this key run" and nothing else — and an operator needs to
+  know where a motion *ended*. `dw` is not `d` then `w`; it is one range from the
+  caret to wherever `w` would have gone, and whether the character it lands on
+  belongs to that range is exactly what separates `de` from `dw`. A command name
+  cannot carry that, so `d` set a half-typed flag, the next key discarded it, and
+  `dw` was `w`.
+
+  Motions are now rules that answer an endpoint plus the two facts an operator
+  needs about it — inclusive (does the landing character belong to the range:
+  `$` and `e` do, `w` and `h` do not) and linewise (is the range whole lines:
+  `j` and `G` are). Normal mode, a pending operator and `.` all read the same
+  rule, so they cannot disagree about where `w` goes.
+
+- **Text objects.** Two keys that name a *region* rather than a place, which no
+  motion can express: `iw aw iW aW`, `i" a"`, `i' a'`, `i( a(` and `ib ab`,
+  `i[ a[`, `i{ a{`, `i< a<`, `it at` across lines, `ip ap`, `is as`. They follow
+  an operator (`ci"`), a motion, or stand alone in visual mode to re-aim a
+  selection (`vi"`). A name that covers nothing — `di(` outside a bracket —
+  does nothing, which is what vim does.
+
+- **Counts everywhere.** `3x` cuts three characters, `3w` moves three words,
+  `2dd` takes two lines. A count on either side of an operator multiplies, so
+  `2d3w` deletes six words. Before, the count was parsed and then read by exactly
+  one key, `gt`.
+
+- **Shifted punctuation reaches vim as the character it produces.** The host
+  reports the *unshifted* key and a separate shift flag — `"` arrives as `'`
+  with shift held, `$` as `4`. `vimode/keys.lua` maps both spellings. Without
+  it, `yi"` matched nothing and the key was silently swallowed, which is the
+  report this release answers.
+
+- **`V` for visual line**, and `o` to swap which end of a selection the caret is
+  on. Visual mode now counts, and takes text objects.
+
+- **`.` to repeat the last change**, at the caret's new position rather than the
+  old coordinates — which is what makes it useful on the next line.
+
+- **`gu` / `gU` / `g~`**, over a motion or a text object, and `u` / `U` in visual
+  mode.
+
+- **`r<char>` to replace**, with a count for more than one character.
+
+- **`0`, `^`, `gg`, `G`, `w W b B e E`, `f F t T ; ,`, `%`, `{ }`, `( )`,
+  `+ -`, `|`, and `H M L` for the window.** `G` tells <kbd>1</kbd><kbd>G</kbd>
+  from <kbd>G</kbd>, which takes a count that means "no count" when absent.
+
+- **Paging.** <kbd>Ctrl</kbd>+<kbd>F</kbd> and <kbd>Ctrl</kbd>+<kbd>B</kbd> for a
+  screen, <kbd>Ctrl</kbd>+<kbd>U</kbd> and <kbd>Ctrl</kbd>+<kbd>D</kbd> for half of
+  one. The docs claimed there was no page movement and that it would need a
+  command that does not exist; the host has had `doc:move-to-next-page` and
+  `doc:move-to-previous-page` all along.
+
+- **Capsular keys are no longer eaten by lowercase ones.** Shift and `d` arrives
+  as the character `d`, so `D` reached the operator table as a pending delete,
+  `C` as a pending change, and `J` was answered by the motion table as `6j`. A
+  shifted letter now skips both tables. Within the capitals the registry is asked
+  first, because `N` and `M` are the one spelling both vocabularies can claim.
+
+### Changed
+
+- **`cdinx/panel.lua` is now `cdinx/panel/`.** One file had grown to hold the
+  view, the row model, the search, the commands and the keys.
+
+  | file | holds |
+  | --- | --- |
+  | `panel/init.lua` | builds the view, splits the pane |
+  | `panel/view.lua` | the view: rows, cursor, scrolling, drawing |
+  | `panel/rows.lua` | catalog → rows. Pure |
+  | `panel/search.lua` | what a query matches. Pure |
+  | `panel/commands.lua` | every command, with the predicate that gates it |
+  | `panel/keymap.lua` | the keys, in three maps |
+
+- **Plugins no longer replace key bindings to join them.** `keymap.add(MAP, true)`
+  on strokes the runtime also owns — `Up`, `Down`, `Return`, `Ctrl+R` — meant
+  the document's arrows and the log view's reload died the moment treeview
+  registered. `keymap.add` **prepends**, so a chain with predicates does the
+  same job and keeps the fallback. Applied across `search`, `tab`, `window`,
+  `session`, `autocomplete`, `autoupdate`, `treeview` and the optional plugins.
+  `X/core/search/keymap.lua` carries the reasoning next to the binding, because
+  it is the kind of thing that gets "tidied up" once.
+
+- **`plugins/cdin-x/init.lua` is one line.** `return require("X.core.manager")`.
+  An installed cdin-x and a bundled cdin-x are the same manager; only how the
+  host finds it differs. Two copies of a bootstrap would be two things to keep in
+  step, and the day they disagree the panel is the thing that is wrong.
+
+- **The catalog reports what is in the editor.** Plugins the host loaded were
+  dropped from the listing, so a fresh build opened an empty panel while vim was
+  running. They are listed now, as *in editor*: present, visible, and not the
+  manager's to remove.
+
+- **`vim-treeview` does more than `:tree`.** It subscribes to vim's `cwd_changed`
+  so `:cd` refreshes the tree, contributes the menu's only context provider
+  (priority 200), and adds the **Tree** menu section at order 20.
+
+- **`vim-search` adds a menu section** (order 40). Four integrations now extend
+  `vim.main` — Tree 20, Git 30, Search 40, CDIN-X 80 — not two.
+
+- **`session` became the quit-wrapping plugin it says it is**, and
+  `tab-session` lost the dependency it did not have: it has its own writer, its
+  own path, and takes only the `on_quit` seam.
+
+- **`X/core/vim/vimode/` is split by concern**, and the split is the point:
+
+  | file | holds |
+  | --- | --- |
+  | `text.lua` | position and range arithmetic over a document |
+  | `motions.lua` | where a key sends the caret, and what that means to an operator |
+  | `textobjects.lua` | the `i`/`a` objects |
+  | `operators.lua` | applying an operator to a span, and the clipboard |
+  | `keys.lua` | the key reader and the half-typed states |
+  | `mode.lua` | which mode you are in |
+
+  Every entry in the middle three is a function of (document, line, column,
+  count) and touches no view, no mode and no clipboard. That is what lets normal
+  mode, a pending operator and `.` share one definition rather than three that
+  agree until one of them changes — and it is what made this fix checkable
+  without an editor.
+
+- **A capital letter asks the plugin registry before vim's own tables.** The one
+  place the documented lookup order flips, because a shifted letter is the only
+  spelling both vocabularies claim.
+
+- **`X/core/vim/README.md` and `docs/plugins/vim.md`** carry the new key tables,
+  and the page no longer claims there is no page movement or no `.`.
+
+### Fixed
+
+- **`Ctrl+Shift+Alt+N` — new directory in the tree — did nothing.** A stroke is
+  not looked up by meaning: the host *builds* the string it will look up
+  (`ctrl+`, `alt+`, `altgr+`, `shift+`, then the key's own name) and matches
+  that string for equality, with no normalisation. `ctrl+shift+alt+n` is
+  therefore not a variant of `ctrl+alt+shift+n`, it is a string no key press
+  produces, and the binding was dead in the same silent way a binding naming an
+  unregistered command is: `on_key_pressed` misses, returns false, nothing is
+  written anywhere. It is `ctrl+alt+shift+n` now, and the docs that repeated the
+  wrong order are corrected.
+- **<kbd>F2</kbd> no longer opens the tree instead of switching the log.** The
+  log view advertises <kbd>F2</kbd> in its own header for switching between its
+  two streams, and `log:switch-source` is view-scoped, so it declines everywhere
+  else and wins the stroke — provided something on the tree's side declines too,
+  because a stroke is a fallback chain and `keymap.add` prepends. Hence
+  `treeview:toggle-key`: a command whose only job is to give that one keystroke a
+  predicate, the same shape as `rename-key` and `delete-key`. `treeview:toggle`
+  itself is untouched, so the palette and every integration can still toggle the
+  tree from the log view.
+- **`make validate` no longer rejects a correct bundle.** `cdinx/` is a
+  `bundle_with` support tree and has been inside the bundle since the manager
+  moved there, but the validator's allow-list still predated it, so every
+  `cdinx/*.lua` was reported as "a non-essential entry" and `make validate` —
+  which CI runs — was red. `cdinx` is now a recognised top-level entry, README and
+  all.
+- **A keystroke nothing could press now fails the build instead of the user.**
+  `make validate` walks every `.lua` file under `cdinx/` and `X/`, and rejects a
+  binding whose stroke the input layer cannot build, naming the reason and the
+  spelling that would have worked. The rule is restated there rather than
+  required from the host, because cdin-x must not depend on cdin's modules;
+  cdin's own `make test-plugins` covers its half, and the host reports every
+  unreachable stroke in the log at boot.
+- **A bundled extension was loaded twice.** cdin-x bootstraps from inside the
+  host's own plugin loop, so `core.plugins.loaded` is missing every entry after
+  it in the alphabet — and cdin-x would load vim out of the bundle with `dofile`
+  while the host loaded it with `require`. Two instances, and the second collided
+  with the first one's commands. The manager now reads the host's plugin
+  directory as well as its loaded set.
+- **A command whose `perform` was a string.** `command.add` stores what it is
+  handed, so a table of names resolved nowhere is a keystroke that raises into
+  `core.try`, logs, and does nothing. The panel's tables are resolved at
+  registration.
+- **A filter that found rows nothing could be selected on.** The cursor was
+  re-seated from the *previous* row list, which put it on a section header or
+  past the end after any filter. It is re-seated from the new one.
+
+- **`*` in vim-search could never fire.** It is registered as `"*"`, and the host
+  sends shift and the 8 key — so the token it was looked up under was `shift+8`.
+  The same normalisation that makes `di"` work makes it reachable.
+
+- **`x` did not put anything on the clipboard.** It ran `doc:delete`, which
+  removes a character and never touches the clipboard, so `x` then `p` pasted
+  whatever was copied last. It goes through `doc:cut` now.
+
+### Documentation
+
+Every plugin in the catalog was read against its documentation, page by page,
+and the pages were corrected against the code rather than the other way round.
+The significant corrections, because a reader would have acted on them:
+
+- **`autoupdate` did not use a status pill.** The page said the badge goes in
+  through `core.register_status_pill` and "disappears by returning nil". It
+  wraps `StatusView.get_items` and splices three cells onto the front of the
+  right-hand group; it is removed by putting the original back. And dismissal is
+  **one boolean, for this session** — not per-version and not persisted — so
+  `autoupdate:skip-version` is a name the behaviour does not earn.
+- **`modules` reported nothing on failure.** The page said a module that fails
+  to require "is reported in the log next to the prompt". The error is caught,
+  returned, and never read; there is a log line on the success path and none on
+  the failure path.
+- **`menu` short-circuits on the *first* character, not a single-character
+  input.** Typing `git` runs the `g` entry and discards the rest, and the live
+  filter collapses the list to that one entry and stops narrowing. The page
+  stated the opposite. Four integrations extend `vim.main`, not two, and the
+  `vim-menu` sections were listed wrong — there is no save, no close, no recent
+  files, no terminal.
+- **`search` never overwrote a binding.** The page described
+  `keymap.add(MAP, true)` and a list-valued `ctrl+d`. Neither exists: `ctrl+d`
+  is a plain string, and the chain is formed by `keymap.add` prepending. The
+  page was describing the design as originally intended — the very failure mode
+  the rest of the documentation is written to prevent. Also: the replace
+  commands rewrite the **whole document**, there is no handoff from a search to a
+  replace, and `find-replace:clear-highlight` silently kills `repeat-find` and
+  `previous-find`.
+- **`treeview` invents a read-only refusal and a per-item refresh.**
+  `readonly.lua` is a badge cache — no command consults it, so rename and delete
+  are not refused on a read-only checkout, and `os.remove`'s result is not even
+  checked. `treeview:refresh-key` performs `treeview:refresh`, which is a **full**
+  project rescan; there is no per-item refresh. `toggle-hidden` is a dotfile
+  regex on a **host-wide** scanner setting, not git's answer, and hidden files
+  are shown by default.
+- **`git`'s API table described three functions that do not exist as documented.**
+  `exe()` takes no arguments and returns the executable path; `exe_cwd()` takes
+  no arguments and returns it prefixed with `-C`; `popen()` returns a captured
+  string, not a handle. Detached HEAD renders as `(1a2b3c)`, not
+  `(detached)`. And this plugin starts no polling thread — the only
+  `core.add_thread(git.status.thread)` in the catalog is in `git-treeview`.
+- **`session` documents none of its five config keys**, including
+  `session_restore`, which is `false` by default — so nothing comes back on
+  launch until you turn it on. And `session:show-info` prints `nil` for the path
+  (see known issues).
+- **`tab` has no tab bar** — it patches the status bar with a `[n/total]`
+  counter. `tab:pin` only blocks `tab:close`, because `close-others` and
+  `close-all` pass `force` and the guard tests `pinned and not force`.
+  `tab:close` never inspects documents, so `tab:close-force` is not "close the
+  dirty one anyway".
+- **`window`: `close-force` does not prompt and `close-all-views` discards
+  unsaved changes without asking.** Focus is geometric and does **not** wrap —
+  only `focus-next`/`focus-prev` do. `maximize-*` leaves the other pane at a
+  tenth of the axis, not collapsed.
+- **`vim`'s `:ls` lists a directory's contents in a scratch buffer**, not open
+  buffers, and `ex/tokenize.lua` has **no range support** — `:5`, `:%d` and
+  `:''a,''b` are not parsed.
+- **The "exactly one essential plugin" claim was in eleven places** and was
+  wrong in all of them: `manager` is essential too. Corrected in
+  `X/core/README.md`, `docs/writing-a-plugin.md`, `CONTRIBUTING.md`,
+  `docs/getting-started.md`, `docs/extending-vim.md`, `docs/plugins/vim.md`,
+  `docs/plugins/optional.md`, `X/optional/README.md`, `X/core/vim/README.md`, and
+  the `tab`, `window` and `treeview` plugin READMEs.
+- **The "ten `vim-*` integrations" claim was wrong** — there are seven
+  `vim-*` plugins plus three that are not about vim mode. Corrected in
+  `X/integration/README.md`, `docs/plugins/vim-integrations.md` and
+  `docs/plugins/manager.md`.
+- **`manager.md` claimed every panel key is behind a view predicate.** It is not:
+  all three `keymap.add` calls are bare, and gating lives on the commands. The
+  visible consequence is that **`Esc` closes the panel from anywhere in the
+  editor**, because `pluginmanager:close` is one of the three persistent commands
+  with no predicate. The page also referenced `make test-panel` and
+  `make test-panel-view`, which do not exist.
+- **`X/core/manager/README.md` said "No network".** There are 418 lines of HTTPS
+  downloader in `fetch.lua` and no registered syncer. It also listed
+  `cdinx/panel.lua`, a file that has not existed since the panel was split.
+- **`docs/getting-started.md` sent a fresh install to the wrong keys.** It said
+  <kbd>Shift</kbd>+<kbd>M</kbd> (vim-only, and only with an optional integration
+  installed), that <kbd>Enter</kbd> "opens the plugin" (it is the same command as
+  <kbd>Space</kbd>), and that <kbd>R</kbd> opens a plugin's README (it rescans;
+  opening the README has no key).
+- **`docs/installing-plugins.md`, `cdinx/README.md`, `CODEOWNERS`** all still
+  described the pre-0.1.0 layout: a cloned registry, `cdinx/panel.lua`, and a
+  `core/` directory that was renamed at 0.1.0.
+- **`docs/plugins/optional.md`** claimed both RTL settings are applied with
+  `~= false`. Only `shaping_enabled` is; `config.direction` is assigned
+  unconditionally on every toggle, so the first press overwrites your setting.
+- **`autocomplete`'s `api.set` takes one argument.** The page's
+  `ac.set("my-language", …)` example implies a two-argument call that does not
+  exist; the second argument is silently discarded and the provider registers
+  empty and matching everything.
+
+### Known issues and limitations
+
+- **`X/manifest.lua` is stale.** `core_files` lists 20 files under `cdinx/`; the
+  tree has 21. `cdinx/manager/loader.lua` — the package searcher every installed
+  extension with more than one file depends on — is missing from the index,
+  because `X/manifest.lua` has not been regenerated since it landed. `make
+  manifest` fixes it. CI's `manifest` job would catch it; it cannot pass until
+  it is regenerated.
+- **The panel and the file tree still fight over the layout.** Both split
+  `core.root_view:get_active_node()` — whichever pane happens to be focused — so
+  whichever extension loaded second takes the layout and the result depends on
+  where you last clicked. The fix (`RootView:attach_side_view`,
+  `config.treeview_side`, an idempotent claim on an edge) was written and then
+  **reverted** in `9828808`, because the host API it needs is not there yet.
+- **`session:show-info` prints `nil` for the path.** `api.info()` returns
+  `Sys.path`; `manager/sys.lua` defines `path` as a *function* and never
+  assigns the field.
+- **`tab:close-all` cannot close the last tab.** The last-tab check runs before
+  `force` is consulted, so it always leaves exactly one and logs
+  `tab: cannot close the last tab`.
+- **Nothing refuses a write to a read-only project.** `readonly.lua` caches which
+  paths could be opened for writing and one function reads it, to draw `"RO"`.
+  `os.remove`'s return value is not checked, so a file that could not be deleted
+  disappears from the tree and the UI with no message.
+- **`trimwhitespace` leaves its command registered.** `unload` is empty: both the
+  `Doc._before_save` hook and the `trim-whitespace:trim-trailing-whitespace`
+  command survive a disable.
+- **`autocomplete`'s unload does not stop its scanner.** `source.stop()` exists
+  and nothing calls it, so the background thread and the `open-docs` provider
+  survive.
+- **`git-treeview`'s unload does not stop git's status thread.** It removes its
+  badge and refresh providers and leaves `core.add_thread(git.status.thread)`
+  running.
+- **`X/core/autoreload/` and `X/core/trimwhitespace/` are README-only
+  directories** sitting next to the single-file plugins that are the actual
+  entries. No scanner sees them, they are in no manifest `files` list, and so they
+  are **not downloaded** when the plugin is installed from the panel — a user
+  gets the `.lua` file and no README.
+- **`Manager.set_registry_syncer` is public, documented, and has no callers.**
+  Nothing validates that an injected function honours the `(root, url)` contract.
+- **`make list` prints 35 of the 45 catalog entries.** `plugin_entries()` never
+  yields themes, so all ten themes are missing from a command four documents
+  describe as "print the catalog".
+- **`validate.lua` does not bound the number of essential plugins.** It fails at
+  zero and fails unless there is exactly one essential *theme*; a third essential
+  plugin would pass silently.
+- **`psx.yml` describes a repository that no longer exists** — roughly twenty
+  dead paths (`core/`, `examples/terraform/`, `docs/architecture/`,
+  `docs/api/`, `docs/guides/`, `.github/workflows/build.yml`,
+  `docs/INSTALLATION.md`, …). `.psx-project.yml` still says `version: "0.1.0"`
+  and points `quality_command` at `make quality`, which does not exist.
+- **`make fmt`, `make fmt-test` and `make check` do not exist**, though
+  `.github/PULL_REQUEST_TEMPLATE.md` still offers them as checklist items. The
+  real quality gate is `make validate`.
+- **`scripts/load_check.lua` is referenced by a comment in `scripts/validate.lua`
+  and does not exist.**
+- **`syntax.add` has no `remove`,** so `unload` is empty in all six language
+  definitions. Two TypeScript types (`comment2`, `special`) are emitted by
+  `X/syntax/typescript.lua` and defined by **no** theme, so both render as
+  `normal`.
+- **`X/integration/session/theme-switcher` is versioned `0.1.0`** while every
+  sibling is `0.2.0`, so `cdin-x:update` treats it as stale for no reason.
+
+### Stability
+
+- Every structural rule the release depends on has a static check behind it.
+  The keystroke check is new and is the reason
+  `ctrl+shift+alt+n` could not have shipped again.
+- The bundler's output was verified against the file set cdin's
+  `docs/architecture/extension-contract.md` documents, and CI compares two clean
+  runs of the whole tree rather than one file.
+- `contract.yml` defaults to cdin's `resplit` branch rather than `main`, because
+  a `main` probe would report success by not running at all — and says so loudly
+  in the step summary when it skips.
+
+### Provenance
+
+The `[Unreleased]` section this entry was built from described four fixes, all
+of them about keystrokes and the validator. Everything under **Added** and
+**Changed** above comes from the 11 commits between `v0.1.0` and this tag; the
+**Documentation** section is a full read of all 16 core plugins, 10 integrations,
+3 optional plugins, 6 syntax definitions and 10 themes against the pages that
+describe them.
+
+An earlier draft of this entry described `X/optional/cursor_fx/` and three
+`make test*` targets. None of them exists — in the tree or in any branch's
+history — so they are not carried forward.
 
 ---
 
