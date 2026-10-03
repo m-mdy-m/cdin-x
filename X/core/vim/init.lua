@@ -15,7 +15,8 @@
 --   api.lua         legacy alias for registry, kept for old plugins
 --   ex/             the ":" command line, split by concern
 --   shell/          running shell commands and showing their output
---   vimode/         modal editing: keys, mode state, status pill
+--   vimode/         modal editing: the key reader, motions, text objects,
+--                   the operators, mode state, and the status pill
 --
 -- Integrations live in X/integration/vim/: vim-tab, vim-window,
 -- vim-search, vim-treeview, vim-git, vim-menu, vim-plugin-manager.
@@ -28,7 +29,7 @@
 -- merely to look the plugin up.
 local M = {
   name = "vim",
-  version = "0.2.0",
+  version = "0.3.0",
   description = "Vim-style modal editing and command-line integration",
   author = "cdin Team",
   license = "MIT",

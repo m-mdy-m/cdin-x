@@ -1,7 +1,7 @@
 # The vim integrations
 
 `vim` knows how to edit. It does not know what a tab is, or a file tree, or a
-repository. Ten small plugins fill that gap, and each one is separately
+repository. Ten small plugins fill that gap — seven `vim-*`, and three that are not about vim mode at all, and each one is separately
 installable, separately removable, and does exactly one thing.
 
 ## The table
@@ -16,7 +16,7 @@ installable, separately removable, and does exactly one thing.
 | `vim-git` | git commands, and the Git section in the menu |
 | `vim-plugin-manager` | <kbd>M</kbd> — the extension manager |
 
-Plus two that are not about vim mode at all:
+Plus three that are not about vim mode at all:
 
 | install this | you get |
 | --- | --- |
@@ -86,7 +86,16 @@ worse than a key that does nothing.
 
 ### vim-treeview
 
-`:tree` and `:trees`. That is the whole plugin, and it is two files.
+`:tree` and `:trees`, and that is not the whole plugin. It also subscribes to
+vim's `cwd_changed` event so `:cd` refreshes the tree, contributes the menu's
+only **context provider** (priority 200, which is why the menu title shows the
+tree's state), and adds the **Tree** menu section — focus, refresh, toggle
+hidden, reveal — at order 20, ahead of everything else.
+
+It registers no vim keys at all. The arrows and `Enter` you use inside the tree
+belong to [`treeview`](treeview.md), and they work in vim mode for a structural
+reason: when the tree has focus, vim mode is not the thing handling your
+keystrokes.
 
 The arrows and <kbd>Enter</kbd> work inside the tree without this plugin,
 because they are `treeview`'s own bindings and the tree has focus — so vim mode
@@ -107,12 +116,12 @@ reach it.
 ### vim-plugin-manager
 
 <kbd>M</kbd>, which opens the extension manager panel, and adds the **CDIN-X**
-section to the menu. <kbd>Shift</kbd>+<kbd>M</kbd> does the same thing without
+section to the menu. <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>M</kbd> does the same thing without
 vim mode, so the panel is reachable either way.
 
 ## Why these are `integration/` and not `core/`
 
-Because a `X/core/` plugin may not depend on another X plugin, and all ten of
+Because a `X/core/` plugin may not depend on another X plugin, and all seven `vim-*` of
 these depend on two: `vim`, and the capability they are wiring.
 
 `vim-search` is the clearest illustration. It depends on `vim` and on `search`,
@@ -136,7 +145,7 @@ Every one of them goes through `X.core.vim.registry`, which has seven seams:
 | `register_wmap(map)` | vim-window (the <kbd>Ctrl</kbd>+<kbd>W</kbd> characters, and `:wincmd`) |
 | `register_visual_key(map)` | nothing yet |
 | `register_action(id, fn)` | nothing yet |
-| `on(event, fn)` | nothing yet — one event exists, `cwd_changed`, used by `git-treeview` |
+| `on(event, fn)` | one event exists: `cwd_changed`, emitted by `:cd` and used by `vim-treeview` |
 
 [docs/extending-vim.md](../extending-vim.md) has the details and a worked
 example.

@@ -1,6 +1,6 @@
 # Extending vim mode
 
-Vim mode is the one plugin a cdin build cannot start without, so it is bundled
+Vim mode is one of the two plugins a cdin build cannot start without, so it is bundled
 into the editor rather than installed beside everything else. That has a
 consequence worth stating plainly: **vim core cannot know what tabs are.**
 
@@ -163,7 +163,7 @@ sorts on, so `tab` is loaded before this. It is also what `make validate`
 checks every cross-plugin `require` against — an integration that requires
 `X.core.tab.manager` without listing `tab` in `dependencies` fails the gate.
 
-**It is the only file in the repository that mentions `X.core.tab`.** That is
+**It is the only file under `X/` that mentions `X.core.tab` outside this page.** That is
 the entire point of the arrangement: one place where the two capabilities meet,
 so either one can be removed without leaving the other half-wired.
 

@@ -460,7 +460,7 @@ return {
     ["vim"] = {
       category = "core",
       type = "plugin",
-      version = "0.2.0",
+      version = "0.3.0",
       description = "Vim-style modal editing and command-line integration",
       essential = true,
       files = {
@@ -485,7 +485,10 @@ return {
         "X/core/vim/vimode/keys.lua",
         "X/core/vim/vimode/mode.lua",
         "X/core/vim/vimode/motions.lua",
+        "X/core/vim/vimode/operators.lua",
         "X/core/vim/vimode/status.lua",
+        "X/core/vim/vimode/text.lua",
+        "X/core/vim/vimode/textobjects.lua",
       },
     },
     ["vim-git"] = {

@@ -28,4 +28,4 @@ not just the plugin that owns menus. Declare `menu` and extend `vim.main` and
 you get `menu is not defined: vim.main` on some runs and not others. The full
 story is in [docs/extending-vim.md](../../docs/extending-vim.md).
 
-**Full page:** [The ten `vim-*` integrations](../../docs/plugins/vim-integrations.md)
+**Full page:** [The vim integrations — seven `vim-*` plugins, and three that are not about vim mode](../../docs/plugins/vim-integrations.md)

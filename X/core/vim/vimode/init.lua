@@ -3,11 +3,22 @@
 -- feature.
 --
 -- Layout of this directory:
---   init.lua     patches keymap.on_key_pressed; the single load point
---   keys.lua     normal/visual key handling and vim's own vocabulary
---   mode.lua     per-view mode state (normal/insert/visual) + label
---   motions.lua  the motion keys h/j/k/l/w/b/e
---   status.lua   the mode pill and the home-screen help entries
+--   init.lua       patches keymap.on_key_pressed; the single load point
+--   keys.lua       the normal/visual key reader, the state machine
+--   text.lua       position and range arithmetic over a document
+--   motions.lua    where a key sends the caret, and whether an operator should
+--                  include the character it lands on
+--   textobjects.lua the i/a objects: two keys naming a region rather than a
+--                  place
+--   operators.lua  doing something with a span, and the clipboard they share
+--   mode.lua       per-view mode state (normal/insert/visual/visual-line) + label
+--   status.lua     the mode pill and the home-screen help entries
+--
+-- The split is not arbitrary. `text.lua` is arithmetic, `motions.lua` and
+-- `textobjects.lua` are rules that use it, `operators.lua` is the only place
+-- that changes a buffer, and `keys.lua` is the only place that knows a key
+-- exists. An operator needs to know where a motion *ended*, which is why the
+-- motion table is not a list of command names — see the header of motions.lua.
 local core    = require "core"
 local config  = require "core.config"
 local keymap  = require "core.input.keymap"

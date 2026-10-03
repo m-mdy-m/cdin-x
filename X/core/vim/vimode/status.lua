@@ -7,9 +7,13 @@ local mode   = require "X.core.vim.vimode.mode"
 local M = {}
 
 local PILL = {
-  normal = { bg = "vim_normal_bg",  label = "NORMAL" },
-  insert = { bg = "vim_insert_bg",  label = "INSERT" },
-  visual = { bg = "vim_visual_bg",  label = "VISUAL" },
+  normal      = { bg = "vim_normal_bg",  label = "NORMAL" },
+  insert      = { bg = "vim_insert_bg",  label = "INSERT" },
+  visual      = { bg = "vim_visual_bg",  label = "VISUAL" },
+  -- Same colour as character-wise visual on purpose: the two differ in what
+  -- they select, not in what they are, and a second shade would be a distinction
+  -- without a difference. The *label* is what tells them apart.
+  visual_line = { bg = "vim_visual_bg",  label = "VISUAL LINE" },
 }
 
 if style.set_fallback then

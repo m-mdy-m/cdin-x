@@ -2,7 +2,7 @@
 
 Modal editing, and the `:` command line.
 
-This is the only plugin marked `essential`. A cdin build copies it in, because
+One of two plugins marked `essential` — the other is `manager`. A cdin build copies it in, because
 an editor with no other modal editing isn't an editor, and it is loaded whether
 or not you install anything else. <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>V</kbd>
 turns it off if you would rather type normally.
@@ -24,8 +24,9 @@ for.
 | --- | --- | --- |
 | **normal** | moving and running commands | <kbd>i</kbd> to insert, <kbd>v</kbd> for visual |
 | **insert** | typing | <kbd>Esc</kbd> |
-| **visual** | selecting | <kbd>Esc</kbd> |
-| **command** | after `:` | <kbd>Esc</kbd>, or running the command |
+| **visual** | selecting characters | <kbd>Esc</kbd> |
+| **visual line** | selecting whole lines, with <kbd>V</kbd> | <kbd>Esc</kbd> |
+| **command** | after <kbd>:</kbd> | <kbd>Esc</kbd>, or running the command |
 
 The mode is shown as a coloured pill at the left of the status bar, and it goes
 through normal → insert → visual as you would expect. Pressing <kbd>Esc</kbd>
@@ -34,74 +35,114 @@ the whole thing.
 
 ## Moving
 
-Normal mode. These eight are the motion set, and they are declared as data in
-`vimode/motions.lua` — a key and the cdin command it runs, in normal mode and
-in visual mode:
+Normal mode. Each of these is a *rule* rather than a command name, which is what
+lets an operator use it: <kbd>dw</kbd> is not <kbd>d</kbd> then <kbd>w</kbd>, it
+is one range from the caret to wherever <kbd>w</kbd> would have gone. They are
+declared as data in `vimode/motions.lua`.
 
-| key | normal | visual |
-| --- | --- | --- |
-| <kbd>h</kbd> <kbd>l</kbd> | one character left / right | select to there |
-| <kbd>j</kbd> <kbd>k</kbd> | one line down / up | select to there |
-| <kbd>w</kbd> <kbd>e</kbd> | next word end | select to there |
-| <kbd>b</kbd> | previous word start | select to there |
-| <kbd>0</kbd> | start of line | — |
-| <kbd>$</kbd> | end of line | — |
-| <kbd>^</kbd> | first non-blank of the line | — |
-| <kbd>gg</kbd> / <kbd>G</kbd> | top / bottom of the file | — |
+| key | goes to |
+| --- | --- |
+| <kbd>h</kbd> <kbd>l</kbd> | one character left / right, never across a line |
+| <kbd>j</kbd> <kbd>k</kbd> | one line down / up, keeping the column |
+| <kbd>w</kbd> <kbd>W</kbd> | next word start / next WORD start |
+| <kbd>b</kbd> <kbd>B</kbd> | previous word start / previous WORD start |
+| <kbd>e</kbd> <kbd>E</kbd> | end of this word, or of the next one |
+| <kbd>0</kbd> | start of line |
+| <kbd>^</kbd> | first non-blank of the line |
+| <kbd>$</kbd> | end of line; with a count, the end of the line below |
+| <kbd>gg</kbd> / <kbd>G</kbd> | first / last line, or line *n* with a count |
+| <kbd>g</kbd><kbd>_</kbd> | last non-blank of the line |
+| <kbd>f</kbd> <kbd>F</kbd> <kbd>t</kbd> <kbd>T</kbd> + a character | to or from that character on this line, stopping one short for <kbd>t</kbd> and <kbd>T</kbd> |
+| <kbd>;</kbd> <kbd>,</kbd> | repeat that find, forwards or backwards |
+| <kbd>%</kbd> | the bracket that matches this one |
+| <kbd>{</kbd> <kbd>}</kbd> | previous / next paragraph |
+| <kbd>(</kbd> <kbd>)</kbd> | previous / next sentence |
+| <kbd>+</kbd> <kbd>-</kbd> | first non-blank of the line below / above |
+| <kbd>\|</kbd> | column *n* |
+| <kbd>H</kbd> <kbd>M</kbd> <kbd>L</kbd> | top / middle / bottom of the window |
 
-**There is no page-scrolling movement.** No <kbd>Ctrl</kbd>+<kbd>U</kbd>, no
-<kbd>Ctrl</kbd>+<kbd>D</kbd>, no <kbd>Ctrl</kbd>+<kbd>F</kbd>, no
-<kbd>Ctrl</kbd>+<kbd>B</kbd>. The status bar shows a scroll percentage, and the
-arrow keys move a line.
+A count goes in front of any of them, so <kbd>3</kbd><kbd>w</kbd> moves three
+words. Paging is <kbd>Ctrl</kbd>+<kbd>F</kbd> and <kbd>Ctrl</kbd>+<kbd>B</kbd> for
+a screen, <kbd>Ctrl</kbd>+<kbd>U</kbd> and <kbd>Ctrl</kbd>+<kbd>D</kbd> for half
+of one. In vim mode <kbd>Ctrl</kbd>+<kbd>D</kbd> is half a screen rather than the
+editor's select-word, which <kbd>iw</kbd> already does.
 
-Which is not an argument against binding them yourself. The motions are ordinary
-cdin commands, so a keymap in your `init.lua` is enough:
+## Text objects
 
-```lua
--- ~/.config/cdin/user/init.lua
-keymap.add {
-  ["ctrl+u"] = "doc:move-to-previous-line",
-  ["ctrl+d"] = "doc:move-to-next-line",
-}
-```
+Two keys that name a *region* instead of a place. The first is <kbd>i</kbd> for
+the inside, or <kbd>a</kbd> for the whole thing including the delimiters. They
+work after an operator (<kbd>di"</kbd>), after a motion, or on their own in
+visual mode to re-aim a selection (<kbd>vi"</kbd>).
 
-That moves a line, not a page, because the underlying commands move a line.
-Page movement would need a command that does it, and there is not one — which is
-the honest limit of this arrangement: a keymap can only reach what the runtime
-already has.
+| key | names |
+| --- | --- |
+| <kbd>iw</kbd> <kbd>aw</kbd> | a word / a word and the whitespace around it |
+| <kbd>iW</kbd> <kbd>aW</kbd> | the same, with punctuation not counted separately |
+| <kbd>i"</kbd> <kbd>a"</kbd> | the text inside the nearest pair of double quotes |
+| <kbd>i'</kbd> <kbd>a'</kbd> | …single quotes |
+| <kbd>i(</kbd> <kbd>a(</kbd>, or <kbd>ib</kbd> <kbd>ab</kbd> | inside the innermost <kbd>()</kbd> pair |
+| <kbd>i[</kbd> <kbd>a[</kbd> | inside <kbd>[]</kbd> |
+| <kbd>i{</kbd> <kbd>a{</kbd> | inside <kbd>{}</kbd> |
+| <kbd>i&lt;</kbd> <kbd>a&lt;</kbd> | inside <kbd>&lt;&gt;</kbd> |
+| <kbd>it</kbd> <kbd>at</kbd> | inside an HTML or XML tag, across lines |
+| <kbd>ip</kbd> <kbd>ap</kbd> | a paragraph, without / with the blank line after it |
+| <kbd>is</kbd> <kbd>as</kbd> | a sentence |
+
+So <kbd>ci"</kbd> changes what is inside the quotes, <kbd>di(</kbd> deletes a
+call's arguments, <kbd>dat</kbd> removes a whole element. If the name covers
+nothing here — <kbd>di(</kbd> outside a bracket, <kbd>di"</kbd> on a line with one
+quote in it — nothing happens, which is what vim does.
+
+**There is no <kbd>in</kbd> / <kbd>an</kbd>.** They need a document-wide search
+and a decision about which of several matches to take, and search is a plugin
+that vim core may not reach for. What they would do is <kbd>*</kbd> and then
+<kbd>c</kbd><kbd>w</kbd>.
 
 ## Editing
 
+An *operator* applies to a range: a motion (<kbd>dw</kbd>), a text object
+(<kbd>di"</kbd>), the line (<kbd>dd</kbd>), or lines and a count
+(<kbd>3</kbd><kbd>dd</kbd>). Counts go on either side of an operator and
+multiply, so <kbd>2</kbd><kbd>d</kbd><kbd>3</kbd><kbd>w</kbd> deletes six words.
+
 | key | does |
 | --- | --- |
-| <kbd>i</kbd> / <kbd>I</kbd> | insert at the cursor / start of line |
-| <kbd>a</kbd> / <kbd>A</kbd> | insert after the cursor / end of line |
-| <kbd>o</kbd> / <kbd>O</kbd> | open a line below / above, and insert |
-| <kbd>x</kbd> | cut the character under the cursor |
-| <kbd>dd</kbd> | delete the line |
-| <kbd>cc</kbd> | delete the line, and insert |
-| <kbd>yy</kbd> | yank the line |
-| <kbd>p</kbd> | paste |
+| <kbd>d</kbd> | delete a motion, an object, or the line |
+| <kbd>y</kbd> | yank one |
+| <kbd>c</kbd> | change one, and insert |
+| <kbd>=</kbd> | indent a motion or an object |
+| <kbd>&gt;</kbd> <kbd>&lt;</kbd> | shift right / left |
+| <kbd>gu</kbd> <kbd>gU</kbd> <kbd>g~</kbd> | lower-case / upper-case / toggle, over the same three things |
+| <kbd>x</kbd> | cut the character under the caret, onto the clipboard |
+| <kbd>X</kbd> | cut the one before it |
+| <kbd>s</kbd> / <kbd>S</kbd> | change one character / the whole line |
+| <kbd>D</kbd> / <kbd>C</kbd> | to the end of the line |
+| <kbd>J</kbd> | join with the line below |
+| <kbd>i</kbd> <kbd>I</kbd> | insert at the caret / at the first non-blank |
+| <kbd>a</kbd> <kbd>A</kbd> | insert after the caret / at the end of the line |
+| <kbd>o</kbd> <kbd>O</kbd> | open a line below / above, and insert |
+| <kbd>p</kbd> <kbd>P</kbd> | paste after / before |
 | <kbd>u</kbd> | undo |
-| <kbd>r</kbd> | redo |
-| <kbd>D</kbd> | cut to the end of the line |
-| <kbd>J</kbd> | join with the next line |
-| <kbd>v</kbd> | visual mode, and out again |
-| <kbd>d</kbd> <kbd>x</kbd> in visual | cut the selection |
-| <kbd>y</kbd> in visual | copy it |
-| <kbd>&gt;</kbd> / <kbd>&lt;</kbd> in visual | indent / unindent it |
+| <kbd>Ctrl</kbd>+<kbd>Y</kbd> | redo |
+| <kbd>r</kbd> then a character | replace the characters under the caret |
+| <kbd>~</kbd> | toggle the case of one character |
+| <kbd>.</kbd> | repeat the last change, at the new caret position |
+| <kbd>v</kbd> / <kbd>V</kbd> | visual / visual line |
+| <kbd>o</kbd> in visual | swap which end the caret is on |
+| <kbd>d</kbd> <kbd>x</kbd> <kbd>c</kbd> <kbd>y</kbd> in visual | act on the selection |
+| <kbd>u</kbd> / <kbd>U</kbd> in visual | lower-case / upper-case it |
+| <kbd>&gt;</kbd> <kbd>&lt;</kbd> <kbd>=</kbd> in visual | shift / indent it |
+| <kbd>i</kbd>… or <kbd>a</kbd>… in visual | re-aim the selection at a text object |
 
-**`r` is redo here, not replace.** That is a deliberate departure from vim, where
-<kbd>r</kbd> replaces one character and redo is <kbd>Ctrl</kbd>+<kbd>R</kbd>. It
-is one of two, and the other is undo's natural neighbour. It is called out here
-because it is exactly the kind of thing you discover by pressing the key and
-being surprised.
+**`r` is vim's replace, and redo moved to <kbd>Ctrl</kbd>+<kbd>Y</kbd>.** That is
+the one key whose meaning changed. <kbd>Ctrl</kbd>+<kbd>Y</kbd> is already the
+editor's redo stroke, so nothing was taken away from it — but if you have been
+pressing <kbd>r</kbd> to redo, use <kbd>Ctrl</kbd>+<kbd>Y</kbd> now.
 
-**There is no <kbd>.</kbd> to repeat the last change.** You will want it, and
-it is not here. A number typed before a command is buffered, but the buffer is
-only consumed by <kbd>g</kbd><kbd>t</kbd> and <kbd>g</kbd><kbd>T</kbd> — so
-<kbd>3</kbd><kbd>g</kbd><kbd>t</kbd> goes to the third tab, and
-<kbd>3</kbd><kbd>x</kbd> cuts one character, not three.
+**`cw` behaves like `ce` on a word.** The one place where <kbd>c</kbd> is not
+<kbd>d</kbd>: changing a word does not also eat the space after it. On
+whitespace it really is <kbd>dw</kbd>.
+
 
 ## The `:` line
 
@@ -123,7 +164,7 @@ These are vim's own, and they are always available:
 | `:wqa` / `:wqall` / `:xa` | save everything and quit |
 | `:e path` | open a file |
 | `:new path` | open a file, creating it if absent |
-| `:ls` | list what is open |
+| `:ls` | list a directory's contents in a scratch buffer |
 | `:pwd` | the working directory |
 | `:cd path` | change directory |
 | `:mkdir path` | make a directory |
@@ -182,7 +223,8 @@ Four pieces, and the seams are the interesting one.
 
 ```text
 vim/keymap.lua        Ctrl+Alt+V, the mode toggle
-vim/vimode/           modes, keys, motions, the status pill
+vim/vimode/           the key reader, positions, motions, text objects,
+                      the operators, the modes and the status pill
 vim/ex/               the : line — tokenizer, history, completion, the command set
 vim/shell/            :!cmd, the scratch buffer, the terminal window
 vim/registry.lua      the seven seams
@@ -191,8 +233,36 @@ vim/api.lua           an older spelling of the registry, kept working
 
 **A key is looked up in this order.** Vim's own keys first, and only if they
 decline does the registry get asked. That ordering is what makes it safe for
-an integration to claim <kbd>m</kbd> or <kbd>M</kbd>: it can add a key, but it
-cannot shadow one vim already handles.
+an integration to claim <kbd>m</kbd>: it can add a key, but it cannot shadow one
+vim already handles.
+
+The one exception is a **capital letter**, which is the single spelling both
+vocabularies can claim: <kbd>N</kbd> is vim's "search backwards" and
+vim-search's "previous find", and <kbd>M</kbd> is vim's "middle of the window"
+and a menu. Shift and <kbd>d</kbd> arrives as the character `d`, so without the
+exception <kbd>D</kbd> would reach the operator table as a plain <kbd>d</kbd> and
+become a pending delete instead of deleting to the end of the line — and
+<kbd>J</kbd> would be answered by the motion table as <kbd>6j</kbd>. So a
+shifted letter skips vim's own tables and asks the registry first.
+
+**An operator needs a range, and a motion is not a range.** That is the whole
+reason `vimode/motions.lua` holds rules rather than command names. Given a key,
+the old table could say which cdin command to run; it could not say where the
+motion *ended*, which is the only thing <kbd>dw</kbd> needs in order to be one
+range from the caret to the start of the next word. So a motion answers an
+endpoint plus two facts about it — whether the character it lands on belongs to
+the range (<kbd>$</kbd> and <kbd>e</kbd> do, <kbd>w</kbd> and <kbd>h</kbd> do
+not), and whether the range is whole lines (<kbd>j</kbd> and <kbd>G</kbd> are).
+One rule, read by normal mode, by a pending operator and by <kbd>.</kbd>
+alike, so all three agree about where <kbd>w</kbd> goes.
+
+**Shifted punctuation arrives as its base key.** The host reports the
+*unshifted* key and a separate shift flag, so <kbd>"</kbd> arrives as
+<kbd>'</kbd> with shift held and <kbd>$</kbd> as <kbd>4</kbd> with shift held.
+`vimode/keys.lua` maps those to the characters they produce. Without that,
+<kbd>"</kbd> matches nothing, the capitals table has no branch for it, the key
+is swallowed — and <kbd>yi"</kbd>, <kbd>di"</kbd> and <kbd>ci"</kbd> do nothing
+at all with nothing on screen to say why.
 
 **Modes are the state, not the views.** `vimode/mode.lua` holds normal /
 insert / visual and nothing about layout. The status pill reads it. That is why
@@ -205,7 +275,7 @@ integrations use, which is why `:tabnew` appears in `:help` and in completion
 only when the tab plugin is actually installed. The registry collects every
 distinct `help` string and prints them in registration order.
 
-**Essential means self-contained.** The bundler copies this plugin *alone* into
+**Essential means self-contained** — for *this* plugin. The bundler copies it *alone* into
 a build, so every `require "X.…"` inside it resolves within its own subtree.
 `make validate` checks that, and there is no other way to catch it that isn't a
 built binary. The cost of that rule is exactly the seam design above: vim
@@ -224,13 +294,16 @@ key will not fire, and the reason is the lookup order above.
 | `keymap.lua` | the mode toggle |
 | `registry.lua` | the seams everything else registers through |
 | `api.lua` | the registry under its older names |
+| `vimode/keys.lua` | the key reader, the half-typed states, and where the registry gets asked |
+| `vimode/text.lua` | position and range arithmetic over a document |
+| `vimode/motions.lua` | where each motion goes, and what it means to an operator |
+| `vimode/textobjects.lua` | the `i`/`a` objects |
+| `vimode/operators.lua` | applying an operator to a span, and the clipboard |
 | `vimode/mode.lua` | which mode you are in |
-| `vimode/keys.lua` | the key reader, and where the registry gets asked |
-| `vimode/motions.lua` | the movement commands |
 | `vimode/status.lua` | the status-bar pill |
 | `ex/commandline.lua` | the `:` line itself |
 | `ex/commands.lua` | vim's own ex commands |
-| `ex/tokenize.lua` | splitting a command line into name, args, ranges |
+| `ex/tokenize.lua` | splitting a command line into a name and args. **No ranges** — `:5`, `:%d`, `:'a,'b` are not parsed |
 | `ex/history.lua` | up and down through the history |
 | `ex/suggest.lua` | path and command completion |
 | `ex/fsops.lua` | the commands that touch the filesystem |
