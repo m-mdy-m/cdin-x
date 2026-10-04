@@ -39,7 +39,7 @@ function M.capture(cmd)
     full = 'powershell -NoProfile -NonInteractive -Command "'
         .. cmd:gsub('"', '\\"') .. ' 2>&1"'
   else
-    full = 'cmd /c "' .. cmd:gsub('"', '""') .. '" 2>&1'
+    full = 'cmd /c "' .. cmd .. '" 2>&1'
   end
 
   local ok, fp = pcall(io.popen, full, "r")
