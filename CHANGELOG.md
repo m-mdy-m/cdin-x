@@ -11,15 +11,22 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
-- **vim 0.3.2 — `:` opened the `:` line instead of being typed, in insert mode.**
-  The check that turns <kbd>Shift</kbd>+<kbd>;</kbd> into the ex line sat *above*
-  the guard that hands insert mode every key back to the editor, so it won: the
-  command line opened, the character never reached the host, and nothing appeared
-  in the buffer — a `:` typed into a file, with no error and nothing on screen to
-  say why. Insert mode is the one mode that check does not claim now, and it says
-  so itself rather than leaving it to a guard further down that it had already
-  passed. Normal and visual mode, and the home screen with no document open,
-  still open the line.
+- **vim 0.3.3 — `:!` doubled every `"` before cmd saw it, on Windows.**
+  `shell.capture` wrapped the command as `cmd /c "<cmd>"` and, to be safe,
+  escaped each `"` inside it as `""`. That is the escape for CSV and PowerShell,
+  not for cmd: cmd strips the outer pair and passes the rest through verbatim,
+  so `git commit -m "chore(docs): add README.md"` reached git as
+  `-m ""chore(docs): add` — an empty string followed by a bare word. `-m` took
+  `chore(docs):`, and `add` and `README.md` were read as pathspecs:
+  `error: pathspec 'add' did not match any file(s) known to git`. The only way
+  to get a commit through was to type `\"`, which then landed in the message
+  with the quotes included.
+
+  The command goes through untouched now, so `:!git commit -m "a b"` behaves the
+  way it does in a terminal and the message is committed without quotes. The
+  vim-git **Commit** menu, which escapes quotes as `\"` itself, was hitting the
+  same bug and is fixed by the same change. The PowerShell capture path
+  (`config.shell_capture_win = "powershell"`) is unchanged.
 
 ## [0.2.0] — 2026-10-03
 
