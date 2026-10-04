@@ -1,0 +1,143 @@
+# AGENTS.md
+
+Instructions for AI coding agents working in this repository. Read this file and `CODE_STYLE.md` completely before the first edit. If a task prompt conflicts with either, stop and ask.
+
+## What this repository is
+
+cdin-x is the extension ecosystem for the cdin editor. It contains:
+
+- `cdinx/` — the kernel: finds, resolves, installs, loads and unloads packages, and draws the manager panel. It is not a package.
+- `packages/` — first-party packages (plugins, languages, themes).
+- `bundles/` — named lists of packages. A build or a user picks a bundle.
+- `registry/` — index of third-party packages that live in their own repositories.
+- `scripts/` — tooling (Lua for in-toolchain work, Python 3 stdlib only for build and install).
+
+cdin (the editor) is a separate repository. It knows nothing about packages and must start, render and edit with an empty site directory. Nothing in this repository may make cdin depend on cdin-x.
+
+The language is Lua, in the version cdin embeds. Confirm the version from the cdin build or ask before using version-specific features (`goto`, integer division, `<const>`/`<close>`, `utf8`, bit operators).
+
+## Layout
+
+```text
+cdinx/       kernel
+plugins/     site entry point (one file)
+packages/    first-party packages, grouped by domain; identity is package.lua, not the path
+bundles/     bundle definitions
+glue/        third-party-only pair packages
+registry/    index.lua (hand-written) and generated/catalog.lua
+scripts/     tooling
+docs/  examples/  fonts/
+```
+
+## Commands
+
+Confirm exact targets in the `Makefile` before relying on them.
+
+```sh
+make validate                  # the gate; must pass before you report any work as done
+make link | install | uninstall
+make bundle BUNDLE=<name> DEST=<dir>
+make list
+```
+
+No test target exists. Do not add one.
+
+## Priorities, in order
+
+1. **Correctness and stability.** The boring, proven approach wins.
+2. **Runtime performance and memory.** The editor is interactive; startup and per-keystroke paths are sacred.
+3. **Simplicity.** The least logic that is correct and robust.
+4. **Modularity.** Small files, one responsibility, explicit seams.
+5. **Brevity.**
+
+The fastest solution is not automatically the best, and the longest is not automatically the safest. Decide from the context: how often the code runs, what fails if it is wrong, and who has to maintain it. When two options are both stable and the trade-off is real, ask (see "When to ask").
+
+## What you write and what you do not
+
+You write production code only.
+
+- **No tests.** The owner writes them. Design code so it is testable (pure functions separated from IO, dependencies passed in), but do not create test files, fixtures or test targets.
+- **No documentation.** Do not create or edit `docs/`, `README.md` files, `CONTRIBUTING.md` or `CHANGELOG.md`. The owner writes these after the code is stable. If a validate rule demands docs or a changelog, make that rule a warning instead of an error and report it.
+- **No comments beyond the policy** in `CODE_STYLE.md`.
+- Throwaway smoke scripts for your own verification go in the scratchpad or a temp directory outside the repository and are never committed.
+
+## Decision rules
+
+- Prefer the standard library and what the repository already does. Add no dependency without asking.
+- No cleverness: no metatable magic, no dynamic `load` of strings (except the sandboxed manifest reader), no monkey-patching of host functions unless the host offers no seam; if you must wrap, use the one shared wrapper utility that records and restores the original.
+- Do not abstract before the third use. Duplicating three lines beats a wrong abstraction.
+- Do not change behaviour while moving code. Moves and edits are separate steps (see "Git").
+- Fail loudly at boundaries, stay quiet inside. Validate input where it enters (files, user config, process output, network); trust it afterwards.
+- Treat every `require`d package other than your own as unavailable until proven loaded.
+
+## When to ask
+
+Ask when the answer changes what you build and you cannot settle it from the code, the task prompt or these rules:
+
+- an irreversible or destructive action (deleting files outside the task, rewriting history, overwriting user data);
+- a public contract: manifest fields, command names, file formats, directory names that users or third parties will depend on;
+- two stable options with a real trade-off (e.g. extra memory for speed, extra files for isolation);
+- unknown host behaviour you cannot read from this repository;
+- a new dependency;
+- any deviation from the architecture in the task prompt.
+
+Do not ask about formatting, naming, or anything these documents already decide.
+
+Every question must carry its context, in this form:
+
+```text
+CONTEXT   What I am doing, in which file or phase, and why this question came up.
+DECISION  The single thing I need decided.
+OPTIONS   2-3 options. For each: what changes, stability, performance/memory, complexity.
+RECOMMEND My pick and the reason.
+DEFAULT   What I will do if there is no answer.
+```
+
+If nobody is available to answer, take the recommended option, say so at the top of your report, and continue with anything that does not depend on it.
+
+## Edge cases
+
+Think about edge cases before writing the code and handle them in the code. The checklist is in `CODE_STYLE.md`. Do not write edge cases into comments or files. Put them in your final report: which ones you handled and how, and which ones you deliberately left unhandled and why.
+
+## Architecture invariants
+
+These hold after every change. `make validate` enforces what it can.
+
+1. A package's identity is `name` in `package.lua`, never its path. Modules are required as `require "<package>.<module>"`.
+2. `package.lua` is pure data: no `require`, no functions, no globals.
+3. A package may use another package only if it is in `depends`, and only through that package's root module. Its submodules are private.
+4. Optional cooperation between two packages lives in the owner's `with/` files (or a `glue` package for third parties), never in a hard `require`.
+5. No package is mandatory. Nothing in `package.lua` marks a package as essential. "Shipped by default" is decided only by a bundle.
+6. The kernel imports nothing from `packages/`. Packages import nothing from `cdinx/` except the documented public API.
+7. Everything a package registers in `init` (commands, keys, hooks, menus, extensions, timers) is released in `unload`, symmetrically.
+8. Requiring a module has no side effects. Registration happens in `init`.
+9. A package that fails to load is disabled with a reason; the editor and every other package keep working.
+10. Startup touches only enabled packages. Full catalog scans happen on demand and are cached.
+
+## Git
+
+- Do not commit, push or tag unless asked. When asked, use `scope: message` (`vim: fix ...`, `cdinx: add ...`).
+- Rename and move files in their own step with no content change, so history follows them.
+- Never run destructive commands (`reset --hard`, `clean -fd`, force push, deleting directories) without asking.
+- Leave unrelated working-tree changes alone.
+
+## Working method
+
+1. Read the relevant code first. Do not infer behaviour from file names.
+2. Make a short task list. Keep the last item as verification.
+3. Change one concern at a time; keep `make validate` green between steps.
+4. Verify with what exists: `make validate`, a syntax check of every Lua file you touched (`luac -p` or `lua -e "loadfile(...)"`), `luacheck`/LuaLS if installed, a before/after diff of bundle output where applicable.
+5. Report using the format below.
+
+## Final report
+
+Keep it short and factual.
+
+```text
+DONE        What changed, by concern (not file by file).
+DECISIONS   Choices you made and the stability/performance reason.
+EDGE CASES  Handled: <case> -> <how>. Not handled: <case> -> <why>.
+VERIFIED    Commands run and their result.
+OPEN        Questions that still need an answer, in the ask format.
+NEXT        The next step, if there is a natural one.
+```
