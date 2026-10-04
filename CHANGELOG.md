@@ -7,6 +7,20 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [Unreleased]
+
+### Fixed
+
+- **vim 0.3.2 — `:` opened the `:` line instead of being typed, in insert mode.**
+  The check that turns <kbd>Shift</kbd>+<kbd>;</kbd> into the ex line sat *above*
+  the guard that hands insert mode every key back to the editor, so it won: the
+  command line opened, the character never reached the host, and nothing appeared
+  in the buffer — a `:` typed into a file, with no error and nothing on screen to
+  say why. Insert mode is the one mode that check does not claim now, and it says
+  so itself rather than leaving it to a guard further down that it had already
+  passed. Normal and visual mode, and the home screen with no document open,
+  still open the line.
+
 ## [0.2.0] — 2026-10-03
 
 `manager` is now a plugin in the catalog and `essential = true`, so every cdin
