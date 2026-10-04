@@ -883,10 +883,24 @@ function M.handle_key(k)
     end
   end
 
+  -- Whether the focused document is being typed into, asked once. The `:` check
+  -- below runs *above* the guard at the bottom of this function that hands
+  -- insert mode every key back to the host, and two separate answers to "is this
+  -- insert mode?" is how shift+; came to open the ex line while somebody was
+  -- trying to type a colon into a buffer.
+  local inserting = view and mode.get(view) == mode.INSERT
+
   -- Shift and `;` is `:`, the way it is in every terminal. Checked against the
   -- base key rather than the character, because `;` reaches here as the base key
   -- with shift held and there is no other key that could mean the ex line.
+  --
+  -- Insert mode is the one mode this key does not claim, and it has to decline
+  -- it right here rather than leave it to the guard below: this check comes
+  -- first, so by the time that guard runs the line is already open. In insert
+  -- mode the reader owns no keys at all — the host moves the caret and inserts
+  -- text — so `:` is text, and returning false is what lets it reach the buffer.
   if shift and k == ";" then
+    if inserting then return false end
     exline.open()
     return true
   end
@@ -910,7 +924,7 @@ function M.handle_key(k)
     return true
   end
 
-  if mode.get(view) == mode.INSERT then
+  if inserting then
     return false
   end
 

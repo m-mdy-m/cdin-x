@@ -220,6 +220,11 @@ whitespace it really is <kbd>dw</kbd>.
 history; <kbd>Tab</kbd> completes paths and command names. <kbd>Esc</kbd> backs
 out.
 
+**In normal and visual mode** <kbd>:</kbd> opens the line. **In insert mode it
+types a colon**, because that is what you are there to do: insert mode reads no
+keys, so every character in it belongs to the buffer, and the editor inserts it
+rather than vim interpreting it.
+
 These are vim's own, and they are always available:
 
 | command | does |
@@ -322,6 +327,13 @@ exception <kbd>D</kbd> would reach the operator table as a plain <kbd>d</kbd> an
 become a pending delete instead of deleting to the end of the line — and
 <kbd>J</kbd> would be answered by the motion table as <kbd>6j</kbd>. So a
 shifted letter skips vim's own tables and asks the registry first.
+
+**Insert mode reads no keys at all**, so a check placed anywhere above the
+insert-mode guard claims a key insert mode is supposed to be typing. That is
+where <kbd>:</kbd> went wrong: the check that opens the `:` line ran first, so a
+colon typed into a buffer opened the command line and the character was never
+handed to the editor. A check that runs above the guard therefore has to ask
+about insert mode itself — the guard is downstream of it and cannot save it.
 
 **An operator needs a range, and a motion is not a range.** That is the whole
 reason `vimode/motions.lua` holds rules rather than command names. Given a key,
