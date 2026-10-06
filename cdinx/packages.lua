@@ -62,7 +62,15 @@ end
 --- @return table packages, string[] problems
 function Packages.load(config)
   if cache then return cache.data, cache.problems end
-  config_used = config or config_used
+
+  -- Fall back to the config module rather than to `config_used`. The boot path
+  -- passes the config in; anything called later -- the panel, an audit -- does not,
+  -- and `config_used` is nil at that point unless boot happened first. Requiring
+  -- `cdinx.config` is the same table boot was handed: it is built once and cached
+  -- in `package.loaded`. Without this the fallthrough is `file = nil`, the load
+  -- returns "no file", caches it, and every later switch is silently inert -- which
+  -- is the failure this whole file exists to avoid.
+  config_used = config or config_used or require("cdinx.config")
 
   -- A path, checked for being a path and nothing more.
   --
@@ -143,6 +151,111 @@ function Packages.load(config)
 
   cache = { data = data, problems = problems }
   return data, problems
+end
+
+--- Checks what the user wrote against the catalog that exists.
+---
+--- `load` can only check a file against itself: that the values are booleans, that
+--- the top-level fields are ones it knows. It cannot know that `gits` is not a
+--- package, or that `workspace` has no feature called `windows`, because answering
+--- either needs the catalog -- and the catalog is not built when this file is read.
+---
+--- So the two are compared here, after the catalog exists, and the answer is
+--- reported rather than refused. A name that matches nothing is almost always a
+--- package that was renamed or uninstalled between one session and the next, and
+--- the user's line is then inert forever with no evidence. Saying so is the
+--- difference between a typo the user can find and one they cannot.
+---
+--- Never changes what is applied. A package that is not installed cannot be
+--- switched off, so the line is harmless either way; refusing the whole file over
+--- one stale name would take the nineteen good lines down with it.
+--- @param available table<string, table>  the merged catalog
+--- @return string[] problems
+function Packages.audit(available)
+  local problems = {}
+  if type(available) ~= "table" then return problems end
+
+  -- An empty catalog means "we do not know", not "nothing exists", and the two
+  -- produce identical reports: every line in the file flagged as unknown. That is
+  -- what a missing root looks like from in here, so saying it would fill the log
+  -- with invented mistakes on a build that is merely misconfigured.
+  local known = 0
+  for _ in pairs(available) do known = known + 1 end
+  if known == 0 then return problems end
+
+  local data = Packages.load()
+
+  -- Names close to what was written, because "did you mean" is only useful if it
+  -- is close. Sorted and capped: a list of every package is not help.
+  local function suggest(name)
+    local best, best_score = nil, 0
+    for candidate in pairs(available) do
+      if candidate ~= name then
+        local score = 0
+        -- A shared prefix is the common case (`gits`, `git`) and a shared
+        -- substring catches `workspace` renamed to `workpace`.
+        if candidate:sub(1, 1) == name:sub(1, 1) then
+          local shared = 0
+          while shared < #candidate and shared < #name
+            and candidate:sub(shared + 1, shared + 1) == name:sub(shared + 1, shared + 1)
+          do shared = shared + 1 end
+          score = shared
+        end
+        if score > best_score then best, best_score = candidate, score end
+      end
+    end
+    -- Two characters of agreement, or it is not a suggestion but a coincidence.
+    if best and best_score >= 2 then return best end
+    return nil
+  end
+
+  local names = {}
+  for name in pairs(data.packages or {}) do names[#names + 1] = name end
+  table.sort(names)
+  for _, name in ipairs(names) do
+    if available[name] == nil then
+      local hint = suggest(name)
+      problems[#problems + 1] = string.format("packages.lua: %q is not in the catalog%s",
+        name, hint and (" -- did you mean " .. string.format("%q", hint) .. "?") or "")
+    end
+  end
+
+  local feature_names = {}
+  for name in pairs(data.features or {}) do feature_names[#feature_names + 1] = name end
+  table.sort(feature_names)
+  for _, name in ipairs(feature_names) do
+    local plugin = available[name]
+    if plugin == nil then
+      problems[#problems + 1] = string.format(
+        "packages.lua: features are set for %q, which is not in the catalog", name)
+    else
+      -- A feature key is checked here as well as in `Features.resolve`, because
+      -- that one only runs for a package that is *loaded*. A package that is
+      -- installed but switched off never reaches `resolve`, so a typo in the one
+      -- file the user edits would be reported only while the package was on -- and
+      -- then it would matter most.
+      local declared = {}
+      for key in pairs(plugin.spec and plugin.spec.features or {}) do
+        declared[key] = true
+      end
+      local keys = {}
+      for key in pairs(data.features[name] or {}) do keys[#keys + 1] = key end
+      table.sort(keys)
+      for _, key in ipairs(keys) do
+        if not declared[key] then
+          local known_keys = {}
+          for k in pairs(declared) do known_keys[#known_keys + 1] = k end
+          table.sort(known_keys)
+          problems[#problems + 1] = string.format(
+            "packages.lua: %s has no feature %q; it has %s", name, key,
+            #known_keys > 0 and table.concat(known_keys, ", ")
+              or "none, so the whole table has no effect")
+        end
+      end
+    end
+  end
+
+  return problems
 end
 
 --- Forgets the file, so the next `load` reads it again.

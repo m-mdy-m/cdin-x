@@ -167,6 +167,13 @@ function Manager.bootstrap()
   collect_provided()
   merge_sources()
 
+  -- Now that the catalog exists, what the user wrote can be compared against what
+  -- is actually there: a name that matches nothing is inert forever and otherwise
+  -- says nothing at all. Reported, never applied and never fatal.
+  for _, problem in ipairs(Packages.audit(Manager.available)) do
+    Host.core.log("cdin-x: %s", problem)
+  end
+
   local ok = Runtime.load_all(ctx, is_disabled)
   if not ok then
     bootstrapped = false
