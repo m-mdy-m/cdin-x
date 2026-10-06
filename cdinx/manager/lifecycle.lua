@@ -1,4 +1,5 @@
-local fs       = require "core.fs"
+local Host = require "cdinx.host"
+local fs   = Host.fs
 local Manifest = require "cdinx.manifest"
 local Util     = require "cdinx.manager.util"
 local Catalog  = require "cdinx.manager.catalog"
@@ -25,15 +26,15 @@ local function is_disabled(ctx, name)
 end
 
 local function place(src, dst)
-  Fetch.mkdir_p(fs.dirname(dst))
-  if fs.exists(dst) then fs.rm(dst) end
+  Fetch.mkdir_p(Host.fs.dirname(dst))
+  if Host.fs.exists(dst) then Host.fs.rm(dst) end
 
-  local moved = fs.move and fs.move(src, dst)
-  if not moved or not fs.exists(dst) then
-    local ok, err = fs.copy(src, dst)
+  local moved = Host.fs.move and Host.fs.move(src, dst)
+  if not moved or not Host.fs.exists(dst) then
+    local ok, err = Host.fs.copy(src, dst)
     if not ok then return false, err or ("could not copy to " .. dst) end
   end
-  if not fs.exists(dst) then
+  if not Host.fs.exists(dst) then
     return false, "nothing was written to " .. dst
   end
   return true
@@ -48,9 +49,13 @@ local function fetch_entry(config, plugin)
     plugin.name, plugin.files)
   if not staged then return false, err end
 
-  local src = Util.join(staged, (rel:gsub("/", PATHSEP or "/")))
+  -- The staging directory keeps each package under the root it was listed at,
+  -- because that is how Fetch.download wrote it; the store is keyed by the path
+  -- below the root.
+  local root = plugin._source_root or "X"
+  local src = Util.join(staged, root, (rel:gsub("/", Host.sep)))
   if plugin._single_file then src = src .. ".lua" end
-  if not fs.exists(src) then
+  if not Host.fs.exists(src) then
     Fetch.discard(staged)
     return false, "the download of " .. tostring(plugin.name) .. " was incomplete"
   end
@@ -108,7 +113,7 @@ function Lifecycle.install(ctx, config, name, ensure_registry, save_state, stack
       return false, "dependency " .. dep .. ": " .. tostring(err)
     end
     if needs_fetch then
-      require("core").log("cdin-x: installed %s (required by %s)", dep, name)
+      Host.core.log("cdin-x: installed %s (required by %s)", dep, name)
     end
   end
   stack[name] = nil
@@ -140,7 +145,7 @@ function Lifecycle.install(ctx, config, name, ensure_registry, save_state, stack
         Fetch.discard(staged)
         return false, "dependency " .. dep .. ": " .. tostring(err)
       end
-      require("core").log("cdin-x: installed %s (required by %s)", dep, name)
+      Host.core.log("cdin-x: installed %s (required by %s)", dep, name)
     end
   end
   stack[name] = nil
@@ -161,10 +166,10 @@ function Lifecycle.install(ctx, config, name, ensure_registry, save_state, stack
 end
 
 function Lifecycle.install_local(ctx, config, path, install_fn, save_state)
-  path = fs.abs(path)
+  path = Host.fs.abs(path)
 
   local meta, err, single_file
-  if fs.is_dir(path) then
+  if Host.fs.is_dir(path) then
     meta, err = Manifest.load(path)
     single_file = false
   elseif fs.is_file(path) and path:match("%.lua$") then
@@ -193,9 +198,9 @@ function Lifecycle.install_local(ctx, config, path, install_fn, save_state)
   end
 
   local dst = install_path_for(config, meta)
-  Fetch.mkdir_p(fs.dirname(dst))
-  if fs.exists(dst) then fs.rm(dst) end
-  local copied, copy_err = fs.copy(path, dst)
+  Fetch.mkdir_p(Host.fs.dirname(dst))
+  if Host.fs.exists(dst) then Host.fs.rm(dst) end
+  local copied, copy_err = Host.fs.copy(path, dst)
   if not copied then return false, copy_err end
 
   ctx.state.lock[meta.name] = {
@@ -300,7 +305,7 @@ function Lifecycle.clean(ctx, user_extensions_root, registry_root, dry_run)
   for _, name in ipairs(orphaned) do
     local plugin = on_disk[name]
     if ctx.installed[name] then Runtime.unload_plugin(ctx, name) end
-    local ok, err = fs.rm(plugin._path)
+    local ok, err = Host.fs.rm(plugin._path)
     if not ok then
       errors[#errors + 1] = name .. ": " .. tostring(err)
     else
@@ -377,8 +382,8 @@ function Lifecycle.uninstall(ctx, name, save_state)
   if not ok and ctx.installed[name] then return false, err end
 
   local path = (plugin._source == "installed") and plugin._path or nil
-  if path and fs.exists(path) then
-    local rm_ok, rm_err = fs.rm(path)
+  if path and Host.fs.exists(path) then
+    local rm_ok, rm_err = Host.fs.rm(path)
     if not rm_ok then return false, rm_err end
   end
   ctx.state.disabled[name] = nil

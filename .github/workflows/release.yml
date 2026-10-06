@@ -226,9 +226,9 @@ jobs:
 
           ### For a cdin build — bundled, not installed
 
-          A cdin build needs the mandatory set — the `vim` plugin, the `default`
-          theme and the fonts — because an editor without them cannot start. A
-          build copies them out of a cdin-x checkout:
+          A cdin build picks what it carries by naming a bundle; `standard` is
+          the one that holds the `vim` package, the `default` theme, the
+          manager and the fonts. A build copies them out of a cdin-x checkout:
 
           ```sh
           cd ../cdin
@@ -238,8 +238,8 @@ jobs:
           make CDINX_DIR=/path/to/cdin-x
           ```
 
-          `make bundle DEST=<dir>` here produces the same artifact. It is
-          attached below as `cdin-x-bundle-TAG.tar.gz`.
+          `make bundle BUNDLE=standard DEST=<dir>` here produces the same
+          artifact. It is attached below as `cdin-x-bundle-TAG.tar.gz`.
 
           ### For a user — installed into the editor's site directory
 

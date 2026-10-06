@@ -4,10 +4,13 @@
 # Global owners
 *                   @m-mdy-m
 
-# Extension manager (was: core/ before 0.1.0)
+# The kernel (was: the extension manager, before 0.1.0)
 cdinx/              @m-mdy-m
 
-# Extension catalog
+# First-party packages
+packages/           @m-mdy-m
+
+# What has not moved into packages/ yet: themes, syntax, the vim integrations
 X/                  @m-mdy-m
 
 # Scripts

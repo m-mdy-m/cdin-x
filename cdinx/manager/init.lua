@@ -1,6 +1,6 @@
 -- CDIN-X extension manager — public facade.
-local core     = require "core"
-local fs       = require "core.fs"
+local Host = require "cdinx.host"
+local fs   = Host.fs
 local config   = require "cdinx.config"
 
 local Util      = require "cdinx.manager.util"
@@ -37,12 +37,18 @@ local function user_extensions_root()
   return config.extension_dir
 end
 
+-- Two roots, scanned for the same thing: `X/` holds what has not been moved
+-- into `packages/` yet, and `packages/` holds what has. Both are searched, so a
+-- tree can be half-moved -- which is exactly what it is while the move is in
+-- progress -- and a package is found wherever it is.
 local function builtin_roots()
   local roots = {}
   if config.bundle_dir then
     roots[#roots + 1] = Util.join(config.bundle_dir, "X")
+    roots[#roots + 1] = Util.join(config.bundle_dir, "packages")
   end
   roots[#roots + 1] = Util.join(config.site_dir, "X")
+  roots[#roots + 1] = Util.join(config.site_dir, "packages")
   return roots
 end
 
@@ -115,7 +121,7 @@ local function collect_provided()
   end
 
   local dir = config.bundle_dir and Util.join(config.bundle_dir, "plugins")
-  for _, entry in ipairs(dir and fs.list(dir) or {}) do
+  for _, entry in ipairs(dir and Host.fs.list(dir) or {}) do
     if entry.type == "file" then
       local name = entry.name:match("^(.+)%.lua$")
       if name then
@@ -166,11 +172,11 @@ function Manager.roots()
   local roots = current_roots()
   local builtin = 0
   for _, root in ipairs(roots.builtin or {}) do
-    if fs.is_dir(root) then builtin = builtin + 1 end
+    if Host.fs.is_dir(root) then builtin = builtin + 1 end
   end
   return {
     registry     = fs.is_file(Util.join(roots.registry, "manifest.lua")),
-    installed    = fs.is_dir(roots.installed),
+    installed    = Host.fs.is_dir(roots.installed),
     builtin      = builtin,
     registry_dir = config.registry_dir,
   }
@@ -198,7 +204,7 @@ function Manager.fetch_catalog(on_done)
   end
 
   catalog.status, catalog.message = "fetching", nil
-  core.add_thread(function()
+  Host.core.add_thread(function()
     while true do
       local ok, perr = Fetch.poll(job)
       if ok ~= nil then
@@ -272,7 +278,7 @@ function Manager.get_readme(name)
   if not plugin then return nil end
   if plugin._single_file then return nil end
   local path = Util.join(plugin._path, "README.md")
-  if fs.is_file(path) then return path end
+  if Host.fs.is_file(path) then return path end
   return nil
 end
 
@@ -282,12 +288,12 @@ function Manager.open_readme(name)
 
   local path = Manager.get_readme(name)
   if path then
-    core.root_view:open_doc(core.open_doc(path))
+    Host.core.root_view:open_doc(Host.core.open_doc(path))
     return true
   end
 
   if plugin._single_file then
-    core.log("%s: %s", plugin.name or name, plugin.description or "(no description)")
+    Host.core.log("%s: %s", plugin.name or name, plugin.description or "(no description)")
     return true
   end
 

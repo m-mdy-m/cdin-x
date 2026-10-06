@@ -130,7 +130,7 @@ custom:
     - path: "/cdinx/panel.lua"
     - path: "/plugins/cdin-x/init.lua"
 
-    # X/ — Essential plugins (non-removable)
+    # X/ — the bundle every cdin build carries by default
     - path: "/X/core/vim/init.lua"
 
     # X/ — Optional workflow plugins (command palette, file finders, modules)
@@ -144,7 +144,7 @@ custom:
     # X/ — Syntax plugins (single-file)
     - path: "/X/syntax/lua.lua"
 
-    # X/ — Extra (non-essential) plugins
+    # X/ — Everything not named by a bundle
     - path: "/X/optional/theme_switcher/init.lua"
 
     # X/ — Themes

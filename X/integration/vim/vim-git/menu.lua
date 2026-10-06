@@ -2,7 +2,7 @@
 --
 -- Kept apart from init.lua so the entry list reads as a menu rather than
 -- as wiring. Command strings come from git's shared recipes
--- (X.core.git.recipes) so there is one spelling of each git invocation in
+-- (git.recipes) so there is one spelling of each git invocation in
 -- the whole repository.
 local M = {}
 
@@ -31,7 +31,7 @@ end
 
 function M.section()
   local shell = require "X.core.vim.shell"
-  local git   = require "X.core.git.api"
+  local git   = require "git.api"
 
   local entries = {}
   for _, e in ipairs(ENTRIES) do

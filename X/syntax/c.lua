@@ -10,7 +10,6 @@ return {
   license = "MIT",
   category = "syntax",
   type = "plugin",
-  essential = false,
   dependencies = {  },
   min_cdin_version = "0.5.0",
   tags = { "language", "c" },

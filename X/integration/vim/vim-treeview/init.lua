@@ -18,7 +18,6 @@ local M = {
   license = "MIT",
   category = "integration",
   type = "plugin",
-  essential = false,
   dependencies = { "vim", "treeview", "menu", "vim-menu" },
   min_cdin_version = "0.5.0",
   tags = { "vim", "treeview", "navigation", "integration" },
@@ -38,7 +37,7 @@ local TREE_ENTRIES = {
 -- no tree view is open or it has no cursor item, which lets the menu fall
 -- back to its own context.
 local function context()
-  local view = require("X.core.treeview.api").get_view()
+  local view = require("treeview.api").get_view()
   if not view or not view.cursor_item then return nil end
   local item = view.cursor_item
   local path = item.abs_filename or item.filename or "."
@@ -64,7 +63,7 @@ function M.init()
 
   local command = require "core.input.command"
   local core    = require "core"
-  local menu    = require "X.core.menu.impl"
+  local menu    = require "menu.impl"
   local registry = require "X.core.vim.registry"
 
   require("X.integration.vim.vim-treeview.commands").register()
@@ -90,7 +89,7 @@ end
 function M.unload()
   if not loaded then return end
   local registry = require "X.core.vim.registry"
-  local menu     = require "X.core.menu.impl"
+  local menu     = require "menu.impl"
 
   registry.off("cwd_changed", on_cwd_changed)
   require("X.integration.vim.vim-treeview.commands").unregister()

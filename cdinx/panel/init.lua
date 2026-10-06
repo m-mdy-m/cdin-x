@@ -1,15 +1,14 @@
 -- CDIN-X Plugin Manager panel.
-local core    = require "core"
-local config  = require "core.config"
-local Manager = require "cdinx.manager"
+local Host        = require "cdinx.host"
+local Manager     = require "cdinx.manager"
 local PanelView   = require "cdinx.panel.view"
 local PanelCmds   = require "cdinx.panel.commands"
 local PanelKeymap = require "cdinx.panel.keymap"
 
 local M = {}
 
-config.pluginmanager_size = config.pluginmanager_size or 460 * SCALE
-config.pluginmanager_min  = config.pluginmanager_min  or 300 * SCALE
+Host.config.pluginmanager_size = Host.config.pluginmanager_size or 460 * Host.scale
+Host.config.pluginmanager_min  = Host.config.pluginmanager_min  or 300 * Host.scale
 
 -- ── the catalog, in the shape rows.lua wants ─────────────────────────────
 
@@ -64,9 +63,9 @@ end
 M.view = PanelView(function()
   return collect(), catalog_notice()
 end)
-M.view.target_width = config.pluginmanager_size
+M.view.target_width = Host.config.pluginmanager_size
 
-local node = core.root_view:get_active_node()
+local node = Host.core.root_view:get_active_node()
 node:split("right", M.view, true)
 
 PanelCmds.bind(M.view)

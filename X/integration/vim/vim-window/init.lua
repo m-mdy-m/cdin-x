@@ -7,7 +7,7 @@
 --   keymap.lua    the Ctrl+W character map and Tab-to-next-pane
 --
 -- Both register into X.core.vim.registry, so this integration is the only
--- place that mentions X.core.window.
+-- place that mentions workspace.window.
 --
 -- The manifest is inline, and nothing is required at the top of the file,
 -- so the extension catalog can dofile() this to read the manifest without
@@ -20,8 +20,7 @@ local M = {
   license = "MIT",
   category = "integration",
   type = "plugin",
-  essential = false,
-  dependencies = { "vim", "window" },
+  dependencies = { "vim", "workspace" },
   min_cdin_version = "0.5.0",
   tags = { "vim", "window", "integration" },
 }

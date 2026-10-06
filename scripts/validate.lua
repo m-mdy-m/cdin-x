@@ -2,10 +2,10 @@
 --
 -- Runs with plain lua, from the repository root: `make validate`. It checks
 -- the things that are cheap to get wrong and expensive to debug at runtime:
--- the required files, the essential set a cdin build bundles, the theme
--- layout, the dependency rules, self-containment of the bundled plugins, and
--- the two rules that keep cdin-x independent of cdin — no EXEDIR, and no
--- `core.x` module namespace left over from the rename.
+-- the required files, the bundles a cdin build is composed from, the theme
+-- layout, the dependency rules, self-containment of every bundle, and the two
+-- rules that keep cdin-x independent of cdin — no EXEDIR, and no `core.x`
+-- module namespace left over from the rename.
 local scan = dofile("scripts/_scan.lua")
 
 -- scan.exists handles files *and* directories; a read-based check would
@@ -13,6 +13,8 @@ local scan = dofile("scripts/_scan.lua")
 local exists = scan.exists
 
 local errors = {}
+local warnings = {}
+local Schema  = dofile("cdinx/schema.lua")
 local root_files = {
   "README.md",
   "cdinx/init.lua",
@@ -46,40 +48,87 @@ else
 end
 
 
--- ── plugins ─────────────────────────────────────────────────────────────
+-- ── the catalog index ──────────────────────────────────────────────────
 local function is_theme(entry)
   return entry.meta.type == "theme" or entry.category == "themes"
 end
 
-local essential_found = 0
+-- Two maps, because two questions are asked of the catalog: `known` is the set
+-- of things that have a require prefix, `catalog` is every name a bundle may
+-- name — a theme has no require prefix, but a bundle still carries it.
+local known, catalog = {}, {}
+-- Where each name was first claimed, so a second claimer can be named. Two
+-- directories declaring one name is never a precedence question inside one
+-- repository: it is a copy left behind by a move, or a manifest that lies about
+-- what it is called, and both are mistakes rather than choices.
+local claimed_at = {}
 for _, entry in ipairs(scan.plugin_entries()) do
-  if entry.meta.essential == true and not is_theme(entry) then
-    essential_found = essential_found + 1
-    if entry.single_file then
-      if not (type(entry.meta.init) == "function" or type(entry.meta.unload) == "function") then
-        errors[#errors+1] = entry.path .. ": essential single-file plugin has no init/unload"
-      end
+  if entry.meta.name then
+    local held = known[entry.meta.name]
+    if held then
+      errors[#errors+1] = string.format(
+        "%s is declared by two directories: %s and %s",
+        entry.meta.name, tostring(held.base), tostring(entry.base))
     else
-      if not exists(entry.base .. "/init.lua") then errors[#errors+1] = entry.base .. "/init.lua not found" end
-      if not exists(entry.base .. "/README.md") then errors[#errors+1] = entry.base .. "/README.md not found" end
+      known[entry.meta.name] = entry
+      catalog[entry.meta.name] = entry
+      claimed_at[entry.meta.name] = entry.base
     end
   end
 end
-if essential_found == 0 then
-  errors[#errors+1] = "no essential = true extensions found under X/ — expected at least one (e.g. core runtime plugins)"
+local themes = scan.theme_entries()
+for _, theme in ipairs(themes) do
+  if catalog[theme.name] == nil then
+    catalog[theme.name] = { base = theme.base, meta = theme.data, theme = true }
+  end
 end
 
--- ── the dependency rule ─────────────────────────────────────────────────
-local known = {}
+-- Nothing marks a package as mandatory: what a build carries is a bundle's
+-- list and nothing else. A manifest that still carries the field is reading a
+-- document that no longer exists, and the reader is the build.
 for _, entry in ipairs(scan.plugin_entries()) do
-  if entry.meta.name then known[entry.meta.name] = entry end
+  if entry.meta.essential ~= nil then
+    errors[#errors+1] = string.format(
+      "%s declares essential — no package does; name a bundle in bundles/ instead",
+      tostring(entry.meta.name))
+  end
+end
+for _, theme in ipairs(themes) do
+  if theme.data.essential ~= nil then
+    errors[#errors+1] = string.format(
+      "theme %s declares essential — no theme does; name a bundle in bundles/ instead",
+      theme.name)
+  end
+end
+
+-- At least one theme root has to exist, and it has to hold at least one theme:
+-- a build whose theme root is missing ships an editor with no `default`, which
+-- the host tolerates by falling back -- so the failure is silent and the only
+-- place it can be caught is here.
+do
+  local found_roots = {}
+  for _, root in ipairs(scan.THEME_ROOTS) do
+    if exists(root) then found_roots[#found_roots + 1] = root end
+  end
+  if #found_roots == 0 then
+    errors[#errors+1] = "no theme root exists; looked for " ..
+      table.concat(scan.THEME_ROOTS, " and ")
+  elseif #scan.theme_entries() == 0 then
+    errors[#errors+1] = "no theme found in " .. table.concat(found_roots, " and ") ..
+      " - a theme is <root>/<name>/theme.lua and the host reads exactly that"
+  end
 end
 
 local function namespace_of(entry)
   return entry.meta.category or entry.category
 end
 
+-- The prefix a package's own modules are required under. A package with a
+-- package.lua is named by that file, and its modules are `require`d as
+-- `<name>.<module>`; everything else is still required by its place in the
+-- tree, and keeps being checked that way.
 local function module_prefix(entry)
+  if entry.package_file then return entry.meta.name end
   local p = entry.path:gsub("\\", "/")
   if entry.single_file then
     p = p:gsub("%.lua$", "")
@@ -118,6 +167,21 @@ local function x_requires(path)
   return out
 end
 
+--- Every `require "a.b"` in a file, whatever it names.
+local function requires_of(path)
+  local f = io.open(path, "rb")
+  if not f then return {} end
+  local src = f:read("*a")
+  f:close()
+  local out, seen = {}, {}
+  local function add(mod)
+    if not seen[mod] then seen[mod] = true; out[#out + 1] = mod end
+  end
+  for mod in src:gmatch('require%s*%(?%s*"([%w_][%w_%.%-]*)"') do add(mod) end
+  for mod in src:gmatch("require%s*%(?%s*'([%w_][%w_%.%-]*)'") do add(mod) end
+  return out
+end
+
 -- directories once per plugin and made validation take minutes.
 local listing_cache = {}
 local function files_under(dir)
@@ -152,31 +216,71 @@ for name, entry in pairs(known) do
   end
 end
 
+-- ── a package with a package.lua ─────────────────────────────────────────
+--
+-- Two rules that only exist because the package declares its name and may
+-- therefore require modules by that name:
+--
+--   no reach into another package   `require "<other>.<sub>"` takes a
+--                                  submodule of a package it did not declare,
+--                                  which is the other half of architecture
+--                                  invariant 3: a dependency's submodules are
+--                                  private.
+--   no cross-package require at all unless declared, same as above.
+--
+-- The two forms live in one tree during the move, so this is checked only for
+-- packages that ship a package.lua; the rest keep the path-shaped rules above.
+for name, entry in pairs(known) do
+  if entry.package_file and not is_theme(entry) then
+    local prefix = module_prefix(entry)
+    local declared = {}
+    for _, d in ipairs(entry.meta.dependencies or {}) do declared[d] = true end
+    local files = entry.single_file and { entry.path } or files_under(entry.base)
+    for _, f in ipairs(files) do
+      for _, mod in ipairs(requires_of(f)) do
+        local owner = owner_of(mod)
+        if owner and owner ~= name then
+          if mod == prefix then
+            -- the owner's own root module, required from outside itself
+          elseif not declared[owner] then
+            errors[#errors+1] = string.format(
+              "%s requires %s, owned by %q, without declaring it: %s", name, mod, owner, f)
+          elseif mod:sub(1, #owner + 1) ~= owner .. "." then
+            -- nothing: mod is the owner's root module
+          else
+            errors[#errors+1] = string.format(
+              "%s requires %s, a submodule of %q — a dependency is used through its root module only: %s",
+              name, mod, owner, f)
+          end
+        end
+      end
+    end
+  end
+end
+
 -- Every declared dependency has to exist, or install order is undefined.
 for name, entry in pairs(known) do
   for _, d in ipairs(entry.meta.dependencies or {}) do
-    if not known[d] then
+    if not catalog[d] then
       errors[#errors+1] = string.format("%s declares dependency %q which is not in the tree", name, d)
     end
   end
 end
 
-local essential_theme_found = 0
-if exists("X/themes") then
-  for _, theme in ipairs(scan.theme_entries()) do
-    if theme.data.essential == true then
-      essential_theme_found = essential_theme_found + 1
+-- A field the schema does not name. A warning, not an error: a package written
+-- against a newer schema must still load, or adopting one becomes a two-step
+-- edit. It is reported because a typo'd field is otherwise invisible — the
+-- kernel reads what it knows and ignores the rest, and its author sees a
+-- package that quietly does not do what they wrote.
+for name, entry in pairs(known) do
+  -- The spec as the file declared it, not the normalised record beside it.
+  if entry.spec then
+    for _, field in ipairs(Schema.unknown_fields(entry.spec)) do
+      warnings[#warnings+1] = string.format(
+        "%s sets %q, which the schema does not define (ignored): %s",
+        name, field, entry.package_file)
     end
   end
-else
-  errors[#errors+1] = "X/themes/ not found"
-end
-if essential_theme_found == 0 then
-  errors[#errors+1] = "no essential = true theme found under X/themes/ — expected exactly one built-in default"
-elseif essential_theme_found > 1 then
-  errors[#errors+1] = string.format(
-    "%d themes are marked essential = true — expected exactly one built-in default theme",
-    essential_theme_found)
 end
 
 -- ── independence from cdin ───────────────────────────────────────────────
@@ -193,7 +297,10 @@ end
 --
 -- Only code is checked, and `--` comments and string literals are stripped
 -- first so a line that merely *mentions* either word is not a failure.
-local CODE_DIRS = { "cdinx", "X" }
+-- Where code lives. Read from the catalog's own roots rather than hard-coded,
+-- so the set follows the move out of X/ instead of needing an edit per package.
+local CODE_DIRS = { "cdinx" }
+for _, root in ipairs(scan.CATALOG_ROOTS) do CODE_DIRS[#CODE_DIRS + 1] = root end
 
 local function code_files(dir)
   local out = {}
@@ -230,31 +337,183 @@ for _, dir in ipairs(CODE_DIRS) do
   end
 end
 
--- ── essential plugins must be self-contained ────────────────────────────
+-- ── every bundle closure is complete and self-contained ──────────────────
 --
--- scripts/bundle.py copies ONE essential plugin and its own files, with no
--- other plugin alongside it. So an essential plugin that requires another
--- X plugin would bundle into something that cannot load: the require would
--- resolve to a module that is not there. This is not a style rule — it is
--- the property that makes the bundle valid, and it cannot be checked any
--- other way, because the failure only appears in a built cdin.
-local function self_contained(entry, name)
-  local files = entry.single_file and { entry.path } or files_under(entry.base)
-  for _, f in ipairs(files) do
-    for _, mod in ipairs(x_requires(f)) do
-      local owner = owner_of(mod)
-      if owner and owner ~= name then
-        errors[#errors+1] = string.format(
-          "essential plugin %s requires %s (owned by %q), which the bundle does not contain: %s",
-          name, mod, owner, f)
-      end
+-- scripts/bundle.py copies the packages a bundle names and nothing else, so a
+-- bundle whose closure reaches outside itself builds into something that
+-- cannot load: the require resolves to a module the build does not have. This
+-- is not a style rule — it is the property that makes the bundle valid, and it
+-- cannot be checked any other way, because the failure only appears in a built
+-- cdin.
+--
+-- The closure is what scripts/bundle.py resolves: the bundle's includes, plus
+-- the `dependencies` of everything in it. Bundles may include other bundles,
+-- so the walk is recursive; `optional` is allowed to name something that is
+-- not there, which is a warning rather than a broken bundle.
+local function load_bundle(path)
+  local chunk, cerr = loadfile(path)
+  if not chunk then
+    errors[#errors+1] = string.format("%s: %s", path, tostring(cerr))
+    return nil
+  end
+  local ok, data = pcall(chunk)
+  if not ok or type(data) ~= "table" then
+    errors[#errors+1] = string.format("%s: a bundle file must return a table", path)
+    return nil
+  end
+  return data
+end
+
+local bundles = {}
+local bundle_paths = scan.list_files_recursive("bundles") or {}
+if #bundle_paths == 0 then
+  errors[#errors+1] = "bundles/ not found or empty — a build names one of these, " ..
+    "and there is none to name"
+end
+table.sort(bundle_paths)
+for _, path in ipairs(bundle_paths) do
+  local bundle = load_bundle(path)
+  if bundle then
+    local file_name = path:match("([^/\\]+)%.lua$")
+    if type(bundle.name) ~= "string" or bundle.name == "" then
+      errors[#errors+1] = path .. ": a bundle file must declare a name"
+    elseif bundle.name ~= file_name then
+      errors[#errors+1] = string.format(
+        "%s declares name %q, but --bundle selects it as %q", path, bundle.name, file_name)
+    elseif bundles[bundle.name] then
+      errors[#errors+1] = string.format("two bundle files declare the name %q", bundle.name)
+    else
+      bundles[bundle.name] = bundle
     end
   end
 end
 
-for name, entry in pairs(known) do
-  if entry.meta.essential == true and not is_theme(entry) then
-    self_contained(entry, name)
+-- `empty` and `minimal` have to stay package-free. `empty` is what a build names
+-- when it wants nothing from this repository, and `minimal` is the kernel alone;
+-- a package quietly added to either is one that ships where the owner said it
+-- would not.
+for _, name in ipairs({ "empty", "minimal" }) do
+  local bundle = bundles[name]
+  if bundle and #(bundle.includes or {}) > 0 then
+    errors[#errors+1] = string.format("bundles/%s.lua names %s — that bundle carries nothing",
+      name, table.concat(bundle.includes or {}, ", "))
+  end
+end
+
+-- Adds `name` and everything it pulls in to `closure`: a package brings the
+-- packages it declares as dependencies, and a bundle brings its members. That
+-- is the closure scripts/bundle.py resolves.
+-- `seen` is the set of bundles being expanded on the current path, so a cycle
+-- is reported as the path rather than as a name repeating with no explanation.
+-- `path` is that path, used only to say who wanted a name that is not there.
+-- Returns false plus a reason; an `optional` name that is not in the tree is
+-- not a failure, because it is optional.
+local function take_member(name, required, closure, seen, path)
+  if closure[name] then return true end
+
+  local entry = catalog[name]
+  if entry then
+    closure[name] = true
+    if not (entry.meta.dependencies or {})[1] then return true end
+    local deeper = {}
+    for i = 1, #path do deeper[i] = path[i] end
+    deeper[#deeper + 1] = name
+    for _, dep in ipairs(entry.meta.dependencies) do
+      local ok, reason = take_member(dep, true, closure, seen, deeper)
+      if not ok then return false, reason end
+    end
+    return true
+  end
+
+  local bundle = bundles[name]
+  if not bundle then
+    if required then
+      local referrer = path[#path]
+      if #path > 1 then
+        return false, string.format("%q needs %q, which is not in the tree",
+          referrer, name)
+      end
+      return false, string.format("bundle %q names %q, which is not in the tree",
+        referrer, name)
+    end
+    return true
+  end
+  if seen[name] then
+    return false, "bundle cycle: " .. table.concat(path, " -> ") .. " -> " .. name
+  end
+
+  seen[name] = true
+  for _, field in ipairs({ "includes", "optional" }) do
+    for _, member in ipairs(bundle[field] or {}) do
+      local ok, reason = take_member(member, field == "includes", closure, seen, { name })
+      if not ok then return false, reason end
+    end
+  end
+  seen[name] = nil
+  return true
+end
+
+-- The closure of each bundle that resolves, kept for the bundle check below:
+-- it is the exact file set scripts/bundle.py is expected to write.
+local closures = {}
+
+local bundle_names = {}
+for bundle_name in pairs(bundles) do bundle_names[#bundle_names+1] = bundle_name end
+table.sort(bundle_names)
+
+for _, name in ipairs(bundle_names) do
+  local closure, reason = {}, nil
+  for _, member in ipairs(bundles[name].includes or {}) do
+    local ok, why = take_member(member, true, closure, { [name] = true }, { name })
+    if not ok then reason = why; break end
+  end
+
+  if not reason then
+    for _, member in ipairs(bundles[name].optional or {}) do
+      if not catalog[member] and not bundles[member] then
+        warnings[#warnings+1] = string.format(
+          "bundle %q: optional %q is not in the tree", name, member)
+      end
+      local ok, why = take_member(member, false, closure, { [name] = true }, { name })
+      if not ok then reason = why; break end
+    end
+  end
+
+  if reason then
+    errors[#errors+1] = string.format("bundle %q does not resolve: %s", name, reason)
+  else
+    -- Everything in the closure has to resolve inside it.
+    local members = {}
+    for member in pairs(closure) do members[#members+1] = member end
+    table.sort(members)
+
+    for _, member in ipairs(members) do
+      local entry = known[member]
+      if entry then
+        local files = entry.single_file and { entry.path } or files_under(entry.base)
+        for _, f in ipairs(files) do
+          for _, mod in ipairs(x_requires(f)) do
+            local owner = owner_of(mod)
+            if owner and not closure[owner] then
+              errors[#errors+1] = string.format(
+                "bundle %q: %s requires %s (owned by %q), which the bundle does not contain: %s",
+                name, member, mod, owner, f)
+            end
+          end
+        end
+        -- A `bundle_with` path that is not in the repository is a build that
+        -- copies nothing where the package's own modules should be.
+        for _, rel in ipairs(entry.meta.bundle_with or {}) do
+          if not exists(rel) then
+            errors[#errors+1] = string.format(
+              "bundle %q: %s declares bundle_with = { %q }, which is not in the tree",
+              name, member, rel)
+          end
+        end
+      end
+    end
+
+    closures[name] = members
   end
 end
 
@@ -287,7 +546,8 @@ end
 -- validation must not trigger one.
 local function seam_target(entry)
   -- the entry point itself, if it defines the seam
-  local src = io.open(entry.single_file and entry.path or (entry.base .. "/init.lua"), "rb")
+  local init_file = entry.single_file and entry.path or (entry.base .. "/init.lua")
+  local src = io.open(init_file, "rb")
   if not src then return nil end
   local body = strip_comments(src:read("*a") or "")
   src:close()
@@ -299,11 +559,21 @@ local function seam_target(entry)
   local mod = body:match('require%s*%(?%s*"([^"]+)"%s*%)%.register%s*%(')
   if not mod then return nil end
 
-  -- resolve the module name to a file, the way the runtime would: the name is
-  -- already a repo-relative path with dots turned into separators, because
-  -- that is how package.path is searched. No root is prefixed — `X.core.tab.impl`
-  -- IS `X/core/tab/impl`, and prefixing a root would make it `X/X/core/…`.
-  local rel = mod:gsub("%.", "/")
+  -- Resolve the module name to a file, the way the runtime would. For a
+  -- package with a package.lua the name starts with the package's own name and
+  -- the rest is a path inside it; for everything else the name is already a
+  -- repo-relative path with dots turned into separators, because that is how
+  -- package.path is searched — `X.core.tab.impl` IS `X/core/tab/impl`, and
+  -- prefixing a root would make it `X/X/core/…`.
+  local rel
+  if entry.package_file then
+    local rest = mod:match("^" .. entry.meta.name .. "%.(.+)$")
+    rel = rest and (entry.base .. "/" .. rest:gsub("%.", "/")) or nil
+  else
+    rel = mod:gsub("%.", "/")
+  end
+  if not rel then return { "?" .. mod, mod } end
+
   for _, cand in ipairs({ rel .. ".lua", rel .. "/init.lua" }) do
     if scan.exists(cand) then return { cand, mod } end
   end
@@ -488,85 +758,159 @@ end
 --
 -- The one check that exercises the real code path. Everything above is a
 -- statement about the source; this runs scripts/bundle.py and compares what
--- came out against what a cdin build is entitled to find.
-local function check_bundle()
-  local python = os.getenv("CDIN_PYTHON") or "python3"
-  local tmp = os.getenv("TMPDIR") or os.getenv("TEMP") or os.getenv("TMP") or "."
-  local out = tmp .. "/cdin-x-validate-bundle"
+-- came out against the exact file set the bundle's closure implies. A bundler
+-- that copies one file too many ships a build whose contents nobody chose, and
+-- one that copies one too few ships a build that loads and then does nothing.
+local PYTHON = os.getenv("CDIN_PYTHON") or "python3"
+local TMPDIR = os.getenv("TMPDIR") or os.getenv("TEMP") or os.getenv("TMP") or "."
 
-  local command = string.format('%s scripts/bundle.py --out "%s" 2>&1',
-    python, out)
+local function run_bundler(bundle, out)
+  local args = bundle and ('--bundle "' .. bundle .. '" ') or ""
+  local command = string.format('%s scripts/bundle.py --out "%s" %s2>&1',
+    PYTHON, out, args)
   local pipe = io.popen(command)
   local output = pipe and pipe:read("*a") or ""
   if pipe then pipe:close() end
+  return output
+end
 
+-- The file set a bundle's closure implies, in destination layout.
+local function expected_files(bundle_name, with_fonts)
+  local expected = {}
+  local function add(rel) expected[rel] = true end
+
+  add("BUNDLE.lua")
+  add("plugins/cdin-x.lua")
+
+  for _, member in ipairs(closures[bundle_name] or {}) do
+    local entry = catalog[member]
+    if entry then
+      -- Where the package's files land. A package goes under the bundle's own
+      -- catalog dir at its domain-relative path, whatever root it sits under
+      -- here; a single-file package is one file. A standalone theme entry goes to
+      -- themes/<name>, because that is where the host's theme registry looks.
+      local leaf = entry.base:match("([^/\\]+)$") or ""
+      local from = entry.base
+      local to = (entry.theme
+        and ("themes/" .. leaf)
+        or ("X/" .. (entry.category or "core") .. "/" .. leaf))
+
+      if entry.single_file then
+        add(to)
+      else
+        local prefix = from:gsub("(%W)", "%%%1")
+        for _, f in ipairs(files_under(from)) do
+          add(to .. f:gsub("^" .. prefix, ""))
+        end
+      end
+
+      -- A theme *package* carries `themes/<name>/theme.lua` inside it. A build
+      -- also has to put each of those at `<data>/themes/<name>/theme.lua`,
+      -- because the host's theme root is that fixed path and a build has no hook
+      -- for pointing it anywhere else -- the package's own add_root only helps a
+      -- site install, where the host is still the one asking. bundle.py flattens
+      -- them; this expects them, so the two cannot drift without the gate failing.
+      if not entry.theme and not entry.single_file then
+        local inner = from .. "/themes"
+        if scan.is_dir(inner) then
+          for _, theme_dir in ipairs(scan.list_dir(inner) or {}) do
+            if theme_dir.type == "dir"
+            and exists(inner .. "/" .. theme_dir.name .. "/theme.lua") then
+              add("themes/" .. theme_dir.name .. "/theme.lua")
+            end
+          end
+        end
+      end
+
+      if not entry.theme then
+        add("plugins/" .. member .. ".lua")
+        for _, rel in ipairs(entry.meta.bundle_with or {}) do
+          for _, f in ipairs(files_under(rel)) do add(f) end
+        end
+      end
+    end
+  end
+
+  if with_fonts ~= false then
+    for _, f in ipairs(files_under("fonts")) do add(f) end
+  end
+  for _, f in ipairs(files_under("cdinx")) do add(f) end
+  return expected
+end
+
+-- The listing comes back with whatever prefix the platform produced — a
+-- relative path for a tree inside the repo, an absolute one for a temp
+-- directory, and a differently-spelled absolute one again under a POSIX
+-- The listing comes back with whatever prefix the platform produced — a relative
+-- path for a tree inside the repo, an absolute one for a temp directory, and a
+-- differently-spelled absolute one again under a POSIX emulation layer.
+--
+-- The relative part is recovered by cutting the known output directory, not by
+-- looking for the last top-level entry: a package may now be *called* `themes`,
+-- and a path like `X/core/themes/themes/nord/theme.lua` ends in four segments
+-- that all look like a top-level name. Guessing which one is real is a way to
+-- report a bundle as wrong when it is right.
+--- @param out string  the directory this check built the bundle in
+--- @param path string
+--- @return string
+local function bundle_rel(out, path)
+  local p = path:gsub("\\", "/")
+  local base = out:gsub("\\", "/")
+  if base:sub(-1) == "/" then base = base:sub(1, -2) end
+
+  -- The listing may or may not carry the directory at all, so try the longest
+  -- spelling of it first and fall back to the last segment of the base.
+  local candidates = { base, base:gsub("^.*/", ""), base:gsub("^.*/", "") }
+  for _, prefix in ipairs(candidates) do
+    if prefix ~= "" and p:sub(1, #prefix + 1) == prefix .. "/" then
+      return p:sub(#prefix + 2)
+    end
+  end
+
+  local cut = p:find("/[^/]+$")
+  return cut and p:sub(cut + 1) or p
+end
+
+--- @param bundle_name string
+--- @param required string[]  files that must be in the output
+--- @param absent string[]|nil  files that must not be
+--- @param with_fonts boolean|nil  whether the closure implies `fonts/`
+local function check_bundle(bundle_name, required, absent, with_fonts)
+  if with_fonts == nil then with_fonts = (absent == nil) end
+  local out = TMPDIR .. "/cdin-x-validate-bundle-" .. bundle_name
+  local output = run_bundler(bundle_name, out)
   if not output:find("bundled") and not output:find("✓") then
-    errors[#errors+1] = "scripts/bundle.py did not run: " ..
-      output:gsub("\n", " ")
+    errors[#errors+1] = string.format("scripts/bundle.py --bundle %s did not run: %s",
+      bundle_name, (output:gsub("\n", " ")))
     return
   end
 
-  -- The exact set a cdin build must find. Anything missing breaks the
-  -- editor; anything extra means the essential marker was applied to
-  -- something that should have stayed optional.
-  local required = {
-    "BUNDLE.lua",
-    "plugins/vim.lua",
-    "themes/default/theme.lua",
-    "X/core/vim/init.lua",
-    "X/core/vim/registry.lua",
-    "X/core/vim/ex/init.lua",
-    "fonts/font.ttf",
-    "fonts/monospace.ttf",
-    "fonts/icons.ttf",
-  }
   for _, path in ipairs(required) do
     if not exists(out .. "/" .. path) then
-      errors[#errors+1] = "bundle is missing " .. path
+      errors[#errors+1] = string.format("bundle %q is missing %s", bundle_name, path)
+    end
+  end
+  for _, path in ipairs(absent or {}) do
+    if exists(out .. "/" .. path) then
+      errors[#errors+1] = string.format(
+        "bundle %q has %s, which it is not supposed to carry", bundle_name, path)
     end
   end
 
-  -- Nothing beyond the essential set may appear in the bundle.
-  --
-  -- The listing comes back with whatever prefix the platform produced — a
-  -- relative path for a tree inside the repo, an absolute one for a temp
-  -- directory, and a differently-spelled absolute one again under a POSIX
-  -- emulation layer. So the relative part is recovered from the last
-  -- top-level entry rather than by stripping a prefix that may not match.
-  local BUNDLE_TOPLEVEL = { "BUNDLE.lua", "X", "cdinx", "fonts", "plugins", "themes" }
-  local function bundle_rel(path)
-    local p = path:gsub("\\", "/")
-    local cut
-    for _, top in ipairs(BUNDLE_TOPLEVEL) do
-      local at, from = nil, 1
-      while true do
-        local found = p:find("/" .. top, from, true)
-        if not found then break end
-        at, from = found, found + 1
-      end
-      if at and (not cut or at > cut) then cut = at end
-    end
-    if not cut then return p end
-    return p:sub(cut + 1)
-  end
-
+  local expected = expected_files(bundle_name, with_fonts)
+  local found = {}
   for _, path in ipairs(scan.list_files_recursive(out) or {}) do
-    local rel = bundle_rel(path)
-    local allowed = rel == "BUNDLE.lua"
-      or rel:match("^plugins/[^/]+%.lua$")
-      or rel:match("^themes/[^/]+/theme%.lua$")
-      or rel:match("^X/core/[^/]+/")          -- an essential plugin's own files
-      or rel:match("^X/core/[^/]+%.lua$")
-      -- `bundle_with = { "cdinx" }` support files, copied verbatim so a bundled
-      -- `require "cdinx…"` resolves; vim declares it. They are the manager, not
-      -- a plugin, and they are inside the bundle on purpose: the tree the
-      -- bundler copies is the tree cdinx/manifest.lua lists as core_files.
-      or rel:match("^cdinx/[^/]+%.lua$")
-      or rel:match("^cdinx/[^/]+%.md$")
-      or rel:match("^cdinx/[^/]+/[^/]+%.lua$")
-      or rel:match("^fonts/[^/]+$")
-    if not allowed then
-      errors[#errors+1] = "bundle contains a non-essential entry: " .. rel
+    local rel = bundle_rel(out, path)
+    found[rel] = true
+    if not expected[rel] then
+      errors[#errors+1] = string.format(
+        "bundle %q contains %s, which the bundle does not name", bundle_name, rel)
+    end
+  end
+  for rel in pairs(expected) do
+    if not found[rel] then
+      errors[#errors+1] = string.format(
+        "bundle %q is missing %s, which its closure names", bundle_name, rel)
     end
   end
 
@@ -576,19 +920,61 @@ local function check_bundle()
   local before = handle and handle:read("*a") or ""
   if handle then handle:close() end
 
-  local second = io.popen(string.format('%s scripts/bundle.py --out "%s" 2>&1', python, out))
-  if second then second:read("*a"); second:close() end
+  run_bundler(bundle_name, out)
 
   local again = io.open(out .. "/BUNDLE.lua", "rb")
   local after = again and again:read("*a") or ""
   if again then again:close() end
 
   if before ~= after or before == "" then
-    errors[#errors+1] = "bundle.py is not idempotent: two runs differ"
+    errors[#errors+1] = string.format("bundle.py is not idempotent for %q: two runs differ",
+      bundle_name)
   end
 end
 
-check_bundle()
+-- `standard` is vim mode and the default theme. There is no `plugins/manager.lua`
+-- and no manager package: every bundle writes the kernel and its shim, and the
+-- shim is what the host loads, so the panel is reachable without any bundle
+-- naming anything.
+check_bundle("standard", {
+  "BUNDLE.lua",
+  "plugins/cdin-x.lua",
+  "plugins/vim.lua",
+  "themes/default/theme.lua",
+  "X/core/vim/init.lua",
+  "X/core/vim/registry.lua",
+  "X/core/vim/ex/init.lua",
+  "cdinx/init.lua",
+  "fonts/font.ttf",
+  "fonts/monospace.ttf",
+  "fonts/icons.ttf",
+}, { "plugins/manager.lua" }, true)
+
+-- `minimal` still has to produce a bootable kernel, and nothing else.
+check_bundle("minimal", { "BUNDLE.lua", "plugins/cdin-x.lua", "cdinx/init.lua" })
+
+-- `empty` is the same, without the fonts: it is what a build names when it
+-- wants nothing from this repository, so it has to be an honest answer rather
+-- than a default that quietly ships vim.
+check_bundle("empty", { "BUNDLE.lua", "plugins/cdin-x.lua", "cdinx/init.lua" },
+  { "fonts/font.ttf" }, false)
+
+-- cdin's assemble_data.py calls the bundler with --out and nothing else, so
+-- that call has to keep producing a usable editor. This is the check that
+-- notices if the default ever stops being `standard`.
+do
+  local out = TMPDIR .. "/cdin-x-validate-default"
+  if exists(out) then os.remove(out) end
+  local output = run_bundler(nil, out)
+  if not output:find("bundled 'standard'") then
+    errors[#errors+1] = "scripts/bundle.py with no --bundle must default to the " ..
+      "standard bundle, because cdin's build calls it that way: " ..
+      output:gsub("\n", " ")
+  elseif not exists(out .. "/plugins/vim.lua") then
+    errors[#errors+1] = "scripts/bundle.py with no --bundle produced a bundle " ..
+      "without vim; cdin's build would ship an editor with no vim mode"
+  end
+end
 
 if #errors > 0 then
   print("cdin-x validation failed:")
@@ -596,5 +982,10 @@ if #errors > 0 then
   os.exit(1)
 end
 
-print(string.format("cdin-x structure valid (%d essential extensions, %d essential theme)",
-  essential_found, essential_theme_found))
+for _, warn_msg in ipairs(warnings) do print("cdin-x warning: " .. warn_msg) end
+
+local plugin_count = 0
+for _ in pairs(known) do plugin_count = plugin_count + 1 end
+
+print(string.format("cdin-x structure valid (%d package(s), %d theme(s), %d bundle(s))",
+  plugin_count, #themes, #bundle_names))

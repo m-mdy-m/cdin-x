@@ -10,7 +10,7 @@ local M = {}
 
 local specs = {}
 
-local function tabs() return require "X.core.tab.manager" end
+local function tabs() return require "workspace.tab.manager" end
 
 local function open_file(arg)
   -- core's own helper: opens the path, and does not create it unless

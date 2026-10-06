@@ -32,10 +32,9 @@ if category == "themes" then
   files[base .. "/theme.lua"] = string.format([[-- %s theme
 --
 -- A theme is a table of colours, applied by the host's theme registry.
--- `essential = false` keeps it out of the mandatory set a cdin build bundles.
+-- A theme is in a build only when some bundle under bundles/ names it.
 return {
   name = %q,
-  essential = false,
   background = "#1e1e2e", background2 = "#181825", background3 = "#313244",
   text = "#cdd6f4", caret = "#f5e0dc",
   accent = "#cba6f7",
@@ -65,10 +64,8 @@ else
   -- init() — a top-level require would run the whole subtree's side effects
   -- just to look the plugin up.
   --
-  -- `essential` is false, and it should stay false unless a cdin build is
-  -- unusable without this plugin: essential plugins are the ones
-  -- scripts/bundle.py copies into a build, and they must be
-  -- self-contained. See docs/architecture/extension-contract.md.
+  -- What a cdin build carries is decided by a bundle in bundles/, never by
+  -- the plugin. Nothing here says this one is more important than another.
   files[base .. "/init.lua"] = string.format([[-- %s
 --
 -- The manifest is inline. Nothing is required at the top of this file, so
@@ -82,7 +79,6 @@ local M = {
   license = "MIT",
   category = %q,
   type = "plugin",
-  essential = false,
   dependencies = {},
   min_cdin_version = "0.5.0",
 }

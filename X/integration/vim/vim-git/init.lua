@@ -2,7 +2,7 @@
 --
 -- Runs every git invocation through vim's shell capability
 -- (X.core.vim.shell) so output lands in a scratch buffer, and takes the
--- command strings from git's shared recipes (X.core.git.recipes) rather
+-- command strings from git's shared recipes (git.recipes) rather
 -- than hardcoding them.
 --
 --   commands.lua  the vim-git:* commands
@@ -18,7 +18,6 @@ local M = {
   license = "MIT",
   category = "integration",
   type = "plugin",
-  essential = false,
   -- Installing vim-git installs all of these with it: the commands need vim's
   -- shell and git's recipes, and the Git menu section needs menu + vim-menu.
   dependencies = { "vim", "git", "menu", "vim-menu" },
@@ -34,7 +33,7 @@ local loaded = false
 -- The menu section is only added when the "vim.main" menu exists, i.e. when
 -- both `menu` and `vim-menu` are loaded. Returns the menu module or nil.
 local function vim_menu()
-  local ok, menu = pcall(require, "X.core.menu.impl")
+  local ok, menu = pcall(require, "menu.impl")
   if not ok or type(menu) ~= "table" then return nil end
   if not (menu.menus and menu.menus["vim.main"]) then return nil end
   return menu

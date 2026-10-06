@@ -1,0 +1,16 @@
+{
+  "runtime.version": "Lua 5.4",
+  "workspace.library": [],
+  "diagnostics.globals": ["ARGS", "VERSION", "PLATFORM", "SCALE", "EXEFILE", "PATHSEP", "system", "renderer"],
+  "diagnostics.groupSeverity": {
+    "strong": "Error",
+    "type-check": "Error",
+    "strict": "Warning"
+  },
+  "diagnostics.groupFileStatus": {
+    "strong": "Any",
+    "type-check": "Any",
+    "strict": "Any"
+  },
+  "hint.enable": false
+}

@@ -16,7 +16,6 @@ local M = {
   license     = "MIT",
   category    = "optional",
   type        = "plugin",
-  essential   = false,
 }
 
 local loaded = false

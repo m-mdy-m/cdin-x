@@ -7,7 +7,8 @@
 # There is no build here. cdin-x is Lua and data: nothing is compiled, nothing
 # is linked, and no platform matrix is meaningful. What exists instead is the
 # gate (`make validate`) and the one thing cdin reads out of this repository —
-# `scripts/bundle.py`'s output.
+# `scripts/bundle.py`'s output for the `standard` bundle. A build that names a
+# different bundle runs the same script with a different `--bundle`.
 #
 # The idempotence check here is deliberately stronger than the one inside
 # validate.lua: that one re-runs bundle.py over the same directory and compares
@@ -61,10 +62,10 @@ jobs:
 
       # The quality gate. This is the same target .husky/pre-commit is supposed
       # to run and `make validate` runs by hand — it checks the required files,
-      # the essential set, the theme layout, dependency rules, the two
-      # independence rules (no EXEDIR, no core.x), self-containment of every
-      # essential plugin, the register/unregister seam, and the bundle's own
-      # file set.
+      # the theme layout, the dependency rules, the two independence rules (no
+      # EXEDIR, no core.x), that every bundle resolves to a complete and
+      # self-contained closure, the register/unregister seam, and that the
+      # bundle the build consumes holds exactly what its closure names.
       - name: Validate the catalog
         env:
           CDIN_PYTHON: python3
@@ -75,13 +76,13 @@ jobs:
 
       - name: Bundle (first pass)
         run: |
-          python3 scripts/bundle.py --out "$RUNNER_TEMP/bundle-1"
+          python3 scripts/bundle.py --out "$RUNNER_TEMP/bundle-1" --bundle standard
           echo "--- files ---"
           ( cd "$RUNNER_TEMP/bundle-1" && find . -type f | sort )
 
       - name: Bundle (second pass) and compare the whole trees
         run: |
-          python3 scripts/bundle.py --out "$RUNNER_TEMP/bundle-2"
+          python3 scripts/bundle.py --out "$RUNNER_TEMP/bundle-2" --bundle standard
           if ! diff -r "$RUNNER_TEMP/bundle-1" "$RUNNER_TEMP/bundle-2"; then
             echo "::error::bundle.py is not idempotent across two clean runs"
             exit 1
@@ -91,12 +92,12 @@ jobs:
       # Belt and braces, and cheap: validate.lua already asserts this set, but
       # it does so from Lua, and a release tag should not depend on one
       # interpreter's idea of what a path separator is.
-      - name: Assert the essential set is present
+      - name: Assert the standard bundle is present
         run: |
           cd "$RUNNER_TEMP/bundle-1"
           missing=0
-          for f in BUNDLE.lua plugins/vim.lua themes/default/theme.lua \
-                   X/core/vim/init.lua X/core/vim/registry.lua \
+          for f in BUNDLE.lua plugins/cdin-x.lua plugins/manager.lua plugins/vim.lua \
+                   themes/default/theme.lua X/core/vim/init.lua X/core/vim/registry.lua \
                    X/core/vim/ex/init.lua fonts/font.ttf \
                    fonts/monospace.ttf fonts/icons.ttf; do
             if [ ! -f "$f" ]; then
@@ -105,7 +106,7 @@ jobs:
             fi
           done
           [ "$missing" -eq 0 ] || exit 1
-          echo "✓ essential set present"
+          echo "✓ standard bundle present"
 
       - name: Tar the bundle
         id: pack

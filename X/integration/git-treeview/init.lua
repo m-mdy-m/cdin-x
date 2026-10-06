@@ -16,7 +16,6 @@ local M = {
   license = "MIT",
   category = "integration",
   type = "plugin",
-  essential = false,
   dependencies = { "git", "treeview" },
   min_cdin_version = "0.5.0",
   tags = { "git", "treeview", "integration" },
@@ -57,8 +56,8 @@ function M.init()
 
   local core     = require "core"
   local style    = require "core.style"
-  local git      = require "X.core.git.api"
-  local treeview = require "X.core.treeview.api"
+  local git      = require "git.api"
+  local treeview = require "treeview.api"
 
   treeview.register_badge_provider(PROVIDER_ID, function(item)
     local status = git.status.get_status(item)
@@ -72,7 +71,7 @@ end
 
 function M.unload()
   if not loaded then return end
-  local treeview = require "X.core.treeview.api"
+  local treeview = require "treeview.api"
   treeview.remove_badge_provider(PROVIDER_ID)
   treeview.remove_refresh_provider(PROVIDER_ID)
   loaded = false

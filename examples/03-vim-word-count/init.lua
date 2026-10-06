@@ -19,7 +19,6 @@ local M = {
   license      = "MIT",
   category     = "integration",
   type         = "plugin",
-  essential    = false,
   dependencies = { "vim" },
 }
 

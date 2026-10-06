@@ -1,7 +1,26 @@
 -- Shared filesystem helper for cdin-x development scripts.
+--
+-- These scripts run with plain lua and no editor, so they cannot reach the
+-- kernel's host adapter. The one thing they share with the kernel is
+-- cdinx/schema.lua, which depends on nothing but the standard library: a
+-- package.lua is read and validated through exactly the same code here and in
+-- the editor.
+local Schema = dofile("cdinx/schema.lua")
+
 local M = {}
 
 local SEP = package.config:sub(1, 1)
+
+--- The roots a first-party package may live under, newest first. A package is
+--- found under whichever has it, so the two do not have to agree on anything.
+M.CATALOG_ROOTS = { "packages", "X" }
+
+--- Where themes live, in preference order. A theme is
+--- `<root>/<name>/theme.lua`, which is the host's fixed layout, so the only thing
+--- that varies is the parent: `X/themes/` before the themes package existed,
+--- `packages/system/themes/themes/` now that it holds them. The package itself is
+--- one catalog entry and is not descended into, so its themes are found here.
+M.THEME_ROOTS = { "packages/system/themes/themes", "X/themes" }
 
 local function shell_quote(path)
   if SEP == "\\" then
@@ -10,85 +29,119 @@ local function shell_quote(path)
   return "'" .. path:gsub("'", "'\\''") .. "'"
 end
 
+--- The file that carries a directory package's manifest, or nil.
+--- `package.lua` first: a package that has one is never executed to be listed,
+--- so the manifest may live somewhere other than its init.lua.
+function M.manifest_path_of(dir)
+  for _, name in ipairs({ "package.lua", "manifest.lua", "init.lua" }) do
+    local candidate = dir .. "/" .. name
+    local handle = io.open(candidate, "rb")
+    if handle then
+      handle:close()
+      return candidate
+    end
+  end
+  return nil
+end
+
+--- Reads a manifest through whichever reader its file needs.
+---
+--- For a package.lua the validated spec is returned as it was read, untouched.
+--- The caller normalises it; mutating it here would make the spec disagree with
+--- the file it came from, and the validator that checks for fields the schema
+--- does not define would then report the ones this function added.
+function M.read_manifest_at(path)
+  if path:match("[/\\]package%.lua$") then
+    local spec = Schema.read(path)
+    if not spec then return nil end
+    return spec, path
+  end
+  return M.read_manifest(path), nil
+end
+
+--- The shape every validator reads: `type` rather than `kind`, `dependencies` as
+--- a sorted list rather than a range map, whatever the manifest actually said.
+--- A fresh table either way — the old form is a `dofile` result that is also
+--- fresh, but the package.lua form is a validated spec that must stay as read.
+local function normalise(meta, is_package_file)
+  if not is_package_file then return meta end
+  local out = {}
+  for k, v in pairs(meta) do out[k] = v end
+  out.type = out.kind or out.type
+  out.dependencies = out.dependencies or Schema.dependency_names(meta)
+  return out
+end
+
 function M.plugin_entries()
   local entries = {}
   local seen_dirs = {}
 
-  -- old format, separate manifest: X/<category>/<name>/manifest.lua
-  local command
-  if SEP == "\\" then
-    command = 'powershell -NoProfile -Command "Get-ChildItem -Path X -Recurse -Filter manifest.lua -File | ForEach-Object { $_.FullName }"'
-  else
-    command = "find " .. shell_quote("X") .. " -type f -name manifest.lua -print"
-  end
-  local pipe = io.popen(command)
-  if pipe then
-    for line in pipe:lines() do
-      if line ~= "" then
-        local plugin_dir = M.dirname(line)
-        local category = plugin_dir and plugin_dir:match("^X[/\\]([^/\\]+)[/\\]")
-        local has_name_segment = plugin_dir and plugin_dir:match("^X[/\\][^/\\]+[/\\].+")
-        if category and has_name_segment then
-          local meta = M.read_manifest(line)
-          if meta then
-            entries[#entries + 1] = {
-              path = line, meta = meta, category = meta.category or category,
-              single_file = false, base = plugin_dir,
-            }
-            seen_dirs[plugin_dir] = true
-          end
-        end
-      end
-    end
-    pipe:close()
-  end
-  local function scan_for_inlined_plugins(dir, category_name)
+  -- A package with a package.lua is data, and its identity is its name.
+  local function scan_for_packages(dir, category_name)
     for _, entry in ipairs(M.list_dir(dir) or {}) do
       if entry.type == "dir" and entry.name ~= ".git" then
         local sub_dir = dir .. "/" .. entry.name
         if not seen_dirs[sub_dir] then
-          local init_path = sub_dir .. "/init.lua"
-          if M.exists(init_path) then
-            local ok, meta = pcall(dofile, init_path)
-            if ok and type(meta) == "table" and type(meta.name) == "string" then
+          local manifest_path = M.manifest_path_of(sub_dir)
+          if manifest_path then
+            local read, is_package_file = M.read_manifest_at(manifest_path)
+            local meta = read and normalise(read, is_package_file)
+            if meta then
               entries[#entries + 1] = {
-                path = init_path, meta = meta,
+                path = manifest_path, meta = meta,
+                -- The validated spec, as the file declared it. Kept beside the
+                -- normalised meta so a check that asks "what did the author
+                -- write?" is not answered by the fields normalisation added.
+                spec = is_package_file and read or nil,
+                -- A declared category wins, and the domain directory is only the
+                -- fallback. This is the same rule cdinx/manager/catalog.lua
+                -- applies, and the two must agree: if they did not, the generated
+                -- catalog would group a package one way and the running editor
+                -- another, and the panel's grouping would depend on which of them
+                -- had read it.
                 category = meta.category or category_name,
                 single_file = false, base = sub_dir,
+                package_file = is_package_file,
               }
               seen_dirs[sub_dir] = true
             end
           else
-            scan_for_inlined_plugins(sub_dir, category_name)
+            scan_for_packages(sub_dir, category_name)
           end
         end
       end
     end
   end
 
-  for _, category_entry in ipairs(M.list_dir("X") or {}) do
-    if category_entry.type == "dir" and category_entry.name ~= ".git" then
-      scan_for_inlined_plugins("X/" .. category_entry.name, category_entry.name)
+  -- Two roots, the same shape under each: <root>/<domain>/<package>/. A
+  -- single-file package is <root>/<domain>/<name>.lua. Reading the roots from
+  -- a table is what lets the move out of X/ finish one directory at a time.
+  for _, root in ipairs(M.CATALOG_ROOTS) do
+    for _, domain_entry in ipairs(M.list_dir(root) or {}) do
+      if domain_entry.type == "dir" and domain_entry.name ~= ".git" then
+        scan_for_packages(root .. "/" .. domain_entry.name, domain_entry.name)
+      end
     end
   end
 
-  -- new format: X/<category>/<name>.lua (excluding the category's own
-  -- generated "manifest.lua" index file, which lives at that same depth)
-  for _, category_entry in ipairs(M.list_dir("X") or {}) do
-    if category_entry.type == "dir" and category_entry.name ~= ".git" then
-      local cat_dir = "X/" .. category_entry.name
-      for _, entry in ipairs(M.list_dir(cat_dir) or {}) do
-        if entry.type == "file" and entry.name ~= "manifest.lua" then
-          local name = entry.name:match("^(.+)%.lua$")
-          if name then
-            local file_path = cat_dir .. "/" .. entry.name
-            local ok, meta = pcall(dofile, file_path)
-            if ok and type(meta) == "table" then
-              entries[#entries + 1] = {
-                path = file_path, meta = meta,
-                category = meta.category or category_entry.name,
-                single_file = true, base = cat_dir,
-              }
+  -- Single-file packages, which live directly under a domain.
+  for _, root in ipairs(M.CATALOG_ROOTS) do
+    for _, domain_entry in ipairs(M.list_dir(root) or {}) do
+      if domain_entry.type == "dir" and domain_entry.name ~= ".git" then
+        local domain_dir = root .. "/" .. domain_entry.name
+        for _, entry in ipairs(M.list_dir(domain_dir) or {}) do
+          if entry.type == "file" and entry.name ~= "manifest.lua" then
+            local name = entry.name:match("^(.+)%.lua$")
+            if name then
+              local file_path = domain_dir .. "/" .. entry.name
+              local ok, meta = pcall(dofile, file_path)
+              if ok and type(meta) == "table" then
+                entries[#entries + 1] = {
+                  path = file_path, meta = meta,
+                  category = meta.category or domain_entry.name,
+                  single_file = true, base = domain_dir,
+                }
+              end
             end
           end
         end
@@ -98,25 +151,6 @@ function M.plugin_entries()
 
   table.sort(entries, function(a, b) return a.path < b.path end)
   return entries
-end
-
-function M.manifest_paths()
-  local command
-  if SEP == "\\" then
-    command = 'powershell -NoProfile -Command "Get-ChildItem -Path X -Recurse -Filter manifest.lua -File | ForEach-Object { $_.FullName }"'
-  else
-    command = "find " .. shell_quote("X") .. " -type f -name manifest.lua -print"
-  end
-
-  local pipe = io.popen(command)
-  if not pipe then return {} end
-  local result = {}
-  for line in pipe:lines() do
-    if line ~= "" then result[#result + 1] = line end
-  end
-  pipe:close()
-  table.sort(result)
-  return result
 end
 
 function M.read_manifest(path)
@@ -133,10 +167,14 @@ function M.basename(path)
   return path:match("([^/\\]+)[/\\]?$" )
 end
 
+-- The domain a package sits under, read from its path rather than assumed, so
+-- it is right under either root.
 function M.category_from_manifest(path)
-  local parent = M.dirname(path)
-  local category = parent and parent:match("X[/\\]([^/\\]+)[/\\][^/\\]+$")
-  return category or "unknown"
+  for _, root in ipairs(M.CATALOG_ROOTS) do
+    local domain = path:match("^" .. (root:gsub("(%W)", "%%%1")) .. "[/\\]([^/\\]+)")
+    if domain then return domain end
+  end
+  return "unknown"
 end
 
 -- Is this path a directory?
@@ -232,22 +270,31 @@ end
 -- A theme is a directory holding theme.lua — the same layout the host's
 -- theme registry uses (<root>/<name>/theme.lua), so a theme can be handed
 -- straight to core.themes.add_root() without being copied or renamed.
+--
+-- THEME_ROOTS is a list because themes have two homes: `X/themes/` where they
+-- were before the themes package existed, and `themes/themes/` inside the
+-- themes package, where they are now. Both are scanned, so a tree can have its
+-- themes in either place and the answer is the same. The package itself is not
+-- descended into by the catalog scan -- it has a package.lua, so it is one
+-- package -- which is why its themes are found here rather than there.
 function M.theme_entries()
   local entries = {}
-  local themes_dir = "X/themes"
-  if not M.exists(themes_dir) then return entries end
-  for _, entry in ipairs(M.list_dir(themes_dir) or {}) do
-    if entry.type == "dir" and entry.name ~= ".git" then
-      local path = themes_dir .. "/" .. entry.name .. "/theme.lua"
-      if M.exists(path) then
-        local ok, data = pcall(dofile, path)
-        if ok and type(data) == "table" then
-          entries[#entries + 1] = {
-            name = data.name or entry.name,
-            path = path,
-            base = themes_dir .. "/" .. entry.name,
-            data = data,
-          }
+  for _, themes_dir in ipairs(M.THEME_ROOTS) do
+    if M.exists(themes_dir) then
+      for _, entry in ipairs(M.list_dir(themes_dir) or {}) do
+        if entry.type == "dir" and entry.name ~= ".git" then
+          local path = themes_dir .. "/" .. entry.name .. "/theme.lua"
+          if M.exists(path) then
+            local ok, data = pcall(dofile, path)
+            if ok and type(data) == "table" then
+              entries[#entries + 1] = {
+                name = data.name or entry.name,
+                path = path,
+                base = themes_dir .. "/" .. entry.name,
+                data = data,
+              }
+            end
+          end
         end
       end
     end

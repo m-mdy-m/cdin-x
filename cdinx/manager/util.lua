@@ -1,3 +1,4 @@
+local Host = require "cdinx.host"
 local Util = {}
 
 function Util.count(t)
@@ -11,7 +12,7 @@ function Util.join(...)
   local out = values[1]
   for i = 2, #values do
     if out:sub(-1) ~= "/" and out:sub(-1) ~= "\\" then
-      out = out .. PATHSEP
+      out = out .. Host.sep
     end
     out = out .. values[i]
   end
@@ -20,7 +21,7 @@ end
 
 function Util.quote(s)
   s = tostring(s)
-  if PATHSEP == "\\" then
+  if Host.sep == "\\" then
     return '"' .. s:gsub('"', '\\"') .. '"'
   end
   return "'" .. s:gsub("'", "'\\''") .. "'"
@@ -33,10 +34,8 @@ function Util.result_ok(a, b, c)
   return false
 end
 
-local fs = require "core.fs"
-
 function Util.parent_dir(path)
-  return fs.dirname(path)
+  return Host.fs.dirname(path)
 end
 
 return Util

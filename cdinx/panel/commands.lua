@@ -1,7 +1,6 @@
 -- Every panel command, in one file, with its predicate.
-local core    = require "core"
+local Host    = require "cdinx.host"
 local common  = require "core.utils.common"
-local config  = require "core.config"
 local command = require "core.input.command"
 local Manager = require "cdinx.manager"
 local Command = require "cdinx.command"
@@ -14,7 +13,7 @@ function M.bind(panel_view)
 end
 
 local function is_active()
-  return view ~= nil and core.active_view == view
+  return view ~= nil and Host.core.active_view == view
 end
 
 -- Browsing: the panel has focus and no search is being typed.
@@ -30,24 +29,24 @@ end
 local function current()
   local entry = view and view:entry_at_cursor()
   if not entry then
-    core.log("extensions: nothing selected")
+    Host.core.log("extensions: nothing selected")
   end
   return entry
 end
 
 local function report(ok, err)
   if ok then return end
-  core.error("extensions: %s", tostring(err))
+  Host.core.error("extensions: %s", tostring(err))
 end
 
 -- ── the lifecycle of the panel itself ────────────────────────────────────
 
 local function set_visible(visible)
-  local was_active = core.active_view == view
+  local was_active = Host.core.active_view == view
   view.visible = visible
   if visible then
     view:invalidate()
-    core.set_active_view(view)
+    Host.core.set_active_view(view)
     M.bootstrap_catalog()
   else
     -- Closing while focused has to hand focus back, or the next keystroke
@@ -55,11 +54,11 @@ local function set_visible(visible)
     view.searching = false
     view.query = ""
     view:invalidate()
-    if was_active and core.last_active_view then
-      core.set_active_view(core.last_active_view)
+    if was_active and Host.core.last_active_view then
+      Host.core.set_active_view(Host.core.last_active_view)
     end
   end
-  core.redraw = true
+  Host.core.redraw = true
 end
 
 M.set_visible = set_visible
@@ -69,17 +68,17 @@ function M.toggle()
 end
 
 function M.resize(dir)
-  local node = core.root_view:get_active_node()
-  local parent = node and node:get_parent_node(core.root_view.root_node)
-  local width = view.target_width or config.pluginmanager_size
+  local node = Host.core.root_view:get_active_node()
+  local parent = node and node:get_parent_node(Host.core.root_view.root_node)
+  local width = view.target_width or Host.config.pluginmanager_size
   -- The panel owns a locked split, so its width is a pane width, and the
   -- pane is the ceiling: wider than that and it pushes the document off the
   -- window rather than showing more of a list.
-  local ceiling = parent and math.max(parent.size.x - 200 * SCALE,
-    config.pluginmanager_min) or width
-  view.target_width = common.clamp(width + dir * 60 * SCALE,
-    config.pluginmanager_min, ceiling)
-  core.redraw = true
+  local ceiling = parent and math.max(parent.size.x - 200 * Host.scale,
+    Host.config.pluginmanager_min) or width
+  view.target_width = common.clamp(width + dir * 60 * Host.scale,
+    Host.config.pluginmanager_min, ceiling)
+  Host.core.redraw = true
 end
 
 -- ── actions on the selected extension ────────────────────────────────────
@@ -88,20 +87,20 @@ function M.toggle_cursor()
   local entry = current()
   if not entry then return end
   if entry.locked then
-    core.log("extensions: %s is part of the editor and is always on", entry.name)
+    Host.core.log("extensions: %s is part of the editor and is always on", entry.name)
     return
   end
 
   local ok, err
   if entry.status == "installed" then
     ok, err = Manager.disable(entry.name)
-    if ok then core.log("extensions: disabled %s", entry.name) end
+    if ok then Host.core.log("extensions: disabled %s", entry.name) end
   elseif entry.status == "disabled" then
     ok, err = Manager.enable(entry.name)
-    if ok then core.log("extensions: enabled %s", entry.name) end
+    if ok then Host.core.log("extensions: enabled %s", entry.name) end
   else
     ok, err = Manager.install(entry.name)
-    if ok then core.log("extensions: installed %s", entry.name) end
+    if ok then Host.core.log("extensions: installed %s", entry.name) end
   end
   report(ok, err)
   view:invalidate()
@@ -111,30 +110,30 @@ function M.install_cursor()
   local entry = current()
   if not entry then return end
   if entry.locked then
-    core.log("extensions: %s ships with the editor", entry.name)
+    Host.core.log("extensions: %s ships with the editor", entry.name)
     return
   end
   local ok, err = Manager.install(entry.name)
   view:invalidate()
   if not ok then report(ok, err) return end
-  core.log("extensions: installed %s", entry.name)
+  Host.core.log("extensions: installed %s", entry.name)
 end
 
 function M.uninstall_cursor()
   local entry = current()
   if not entry then return end
   if entry.locked then
-    core.log("extensions: %s is part of the editor and cannot be removed",
+    Host.core.log("extensions: %s is part of the editor and cannot be removed",
       entry.name)
     return
   end
   if entry.status ~= "installed" and entry.status ~= "disabled" then
-    core.log("extensions: %s is not installed", entry.name)
+    Host.core.log("extensions: %s is not installed", entry.name)
     return
   end
   local ok, err = Manager.uninstall(entry.name)
   if not ok then report(ok, err) return end
-  core.log("extensions: removed %s", entry.name)
+  Host.core.log("extensions: removed %s", entry.name)
   view:invalidate()
 end
 
@@ -156,7 +155,7 @@ function M.refresh()
   Manager.scan()
   view:invalidate()
   view:_ensure_rows()
-  core.log("extensions: %d listed", view.total)
+  Host.core.log("extensions: %d listed", view.total)
 end
 
 function M.catalog_status()
@@ -164,27 +163,27 @@ function M.catalog_status()
   local state, message = Manager.catalog_state()
   local counts = view.counts or {}
 
-  core.log("extensions: %d listed — %d in editor, %d installed, %d available",
+  Host.core.log("extensions: %d listed — %d in editor, %d installed, %d available",
     view.total, counts.editor or 0, counts.installed or 0, counts.available or 0)
-  core.log("  catalog   : %s (%s)", roots.registry_dir,
+  Host.core.log("  catalog   : %s (%s)", roots.registry_dir,
     roots.registry and "on disk" or "not downloaded")
-  core.log("  download  : %s%s", state, message and (" - " .. message) or "")
-  core.log("  installed : %s", roots.installed and "present" or "nothing installed yet")
+  Host.core.log("  download  : %s%s", state, message and (" - " .. message) or "")
+  Host.core.log("  installed : %s", roots.installed and "present" or "nothing installed yet")
 end
 
 function M.update_catalog()
   local started, err = Manager.fetch_catalog(function(ok, ferr)
     if ok then
-      core.log("extensions: catalog updated")
+      Host.core.log("extensions: catalog updated")
     else
-      core.error("extensions: catalog download failed: %s", tostring(ferr))
+      Host.core.error("extensions: catalog download failed: %s", tostring(ferr))
     end
     view:invalidate()
   end)
   if started then
-    core.log("extensions: downloading the catalog...")
+    Host.core.log("extensions: downloading the catalog...")
   else
-    core.error("extensions: %s", tostring(err))
+    Host.core.error("extensions: %s", tostring(err))
   end
   view:invalidate()
 end
@@ -199,12 +198,12 @@ end
 
 function M.search()
   view.searching = true
-  core.redraw = true
+  Host.core.redraw = true
 end
 
 function M.search_stop()
   view.searching = false
-  core.redraw = true
+  Host.core.redraw = true
 end
 
 function M.search_submit()

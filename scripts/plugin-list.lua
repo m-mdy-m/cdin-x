@@ -9,9 +9,8 @@ for _, entry in ipairs(scan.plugin_entries()) do
   if meta.name then
     local desc = (meta.description or "N/A"):sub(1, 38)
     local ver  = meta.version or "N/A"
-    local ess  = meta.essential and " [ESSENTIAL]" or ""
-    print(string.format("  %-23s %-15s %-40s %s%s",
-      meta.name, meta.category or entry.category, desc, ver, ess))
+    print(string.format("  %-23s %-15s %-40s %s",
+      meta.name, meta.category or entry.category, desc, ver))
     total = total + 1
   end
 end

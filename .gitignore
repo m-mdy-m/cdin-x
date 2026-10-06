@@ -5,6 +5,11 @@
 *.swo
 *~
 
+# A packaged copy of the project. It is a snapshot of the working tree, so it is
+# always behind the tree it was made from and never the source of anything.
+# (Phase 9 asks before removing the file itself; ignoring it is not removing it.)
+*.rar
+
 # IDE
 .idea/
 .vscode/

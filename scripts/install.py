@@ -7,8 +7,9 @@
 
 Three directories go into the site directory, and that is the whole install:
 
-    <site>/cdinx/             the extension manager
-    <site>/X/                 the plugins and themes
+    <site>/cdinx/             the kernel
+    <site>/X/                 themes, and what has not moved into packages/ yet
+    <site>/packages/          first-party packages
     <site>/plugins/cdin-x/    the entry plugin the host loads
 
 The site directory is the host's `config.site_dir`:
@@ -22,8 +23,8 @@ What this deliberately does NOT do:
   * write anything into a cdin checkout. Installing cdin-x never touches the
     editor's tree, its build output, or its source. A cdin that has never
     heard of cdin-x keeps working; one that has, loads it.
-  * filter by `essential`. The essential set is what a cdin BUILD bundles,
-    and that is scripts/bundle.py's job. A user install is the opposite: it
+  * filter by bundle. What a cdin BUILD carries is a bundle's list, and
+    that is scripts/bundle.py's job. A user install is the opposite: it
     is the full catalog, managed at runtime.
   * install fonts. They ship with a cdin build.
 
@@ -38,11 +39,17 @@ import shutil
 import sys
 from pathlib import Path
 
-# (source, destination relative to the site directory)
+# (source, destination relative to the site directory). `packages/` is optional
+# during the move out of X/; `X/` is not, because themes still live there.
 PAYLOAD = [
     ("cdinx", "cdinx"),
     ("X", "X"),
     ("plugins/cdin-x", "plugins/cdin-x"),
+]
+
+# Installed only when present.
+OPTIONAL_PAYLOAD = [
+    ("packages", "packages"),
 ]
 
 
@@ -180,30 +187,39 @@ def repo_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
+def place(src: Path, site: Path, rel_dst: str, use_symlinks: bool) -> None:
+    dst = site / rel_dst
+    # Clean replace: a half-updated install is worse than a missing one,
+    # because the loader would find a mixture of two versions.
+    remove(dst)
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    if use_symlinks:
+        link_tree(src.resolve(), dst)
+    else:
+        copy_tree(src, dst)
+    print("  {} -> {}".format(src, dst))
+
+
 def install(site: Path, root: Path, use_symlinks: bool) -> None:
     for rel_src, rel_dst in PAYLOAD:
         src = root / rel_src
         if not src.is_dir():
             die("missing {} — is this a cdin-x checkout?".format(src))
-        dst = site / rel_dst
-        # Clean replace: a half-updated install is worse than a missing one,
-        # because the loader would find a mixture of two versions.
-        remove(dst)
-        dst.parent.mkdir(parents=True, exist_ok=True)
-        if use_symlinks:
-            link_tree(src.resolve(), dst)
-        else:
-            copy_tree(src, dst)
-        print("  {} -> {}".format(src, dst))
+        place(src, site, rel_dst, use_symlinks)
+
+    for rel_src, rel_dst in OPTIONAL_PAYLOAD:
+        src = root / rel_src
+        if src.is_dir():
+            place(src, site, rel_dst, use_symlinks)
 
     ok("cdin-x installed into {}".format(site))
     if not use_symlinks:
-        print("  the editor's site directory now has cdinx/ and X/ on "
-              "package.path; restart cdin to load it")
+        print("  the editor's site directory now has cdinx/, X/ and packages/ "
+              "on the catalog roots; restart cdin to load it")
 
 
 def uninstall(site: Path) -> None:
-    for rel_src, rel_dst in PAYLOAD:
+    for rel_src, rel_dst in PAYLOAD + OPTIONAL_PAYLOAD:
         dst = site / rel_dst
         if not os.path.lexists(dst):
             continue

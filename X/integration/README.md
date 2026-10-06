@@ -4,18 +4,18 @@ The wiring between capabilities. Nothing here implements anything — these
 directories exist so that two plugins which must not know about each other can
 still meet.
 
-| directory | connects |
-| --- | --- |
-| `git-treeview/` | git status → tree badges and refresh |
-| `tab-session/` | the tab manager ↔ persistent session state |
-| `session/theme-switcher/` | the theme switcher → the session's saved theme |
-| [`vim/`](vim) | vim mode ↔ everything else |
+| directory | connects | status |
+| --- | --- | --- |
+| `git-treeview/` | git status → tree badges and refresh | stays |
+| [`vim/`](vim) | vim mode ↔ everything else | goes in Phase 5, into `vim/with/` |
+| `session/theme-switcher/` | the theme switcher → the session's saved theme | **gone** — part of `themes` |
+| `tab-session/` | the tab manager ↔ persistent session state | **gone** — a feature of `workspace` |
 
 An integration declares what it needs in its manifest, and that declaration is
 what the manager sorts the load order on:
 
 ```lua
-dependencies = { "vim", "tab" }
+dependencies = { "vim", "git" }
 ```
 
 `make validate` checks every cross-plugin `require` and every menu extension

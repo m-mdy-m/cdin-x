@@ -1,6 +1,6 @@
 -- Vim menu integration: the "m" key and the menu it opens.
 --
--- The menu is a generic capability (X.core.menu) that knows nothing about
+-- The menu is a generic capability (menu) that knows nothing about
 -- files, shells or vim. This integration is what binds it to vim mode and
 -- supplies vim's own sections; other integrations (vim-search, vim-treeview,
 -- vim-git, vim-plugin-manager) extend the same menu with theirs.
@@ -21,7 +21,6 @@ local M = {
   license = "MIT",
   category = "integration",
   type = "plugin",
-  essential = false,
   dependencies = { "vim", "menu" },
   min_cdin_version = "0.5.0",
   tags = { "vim", "menu", "integration" },

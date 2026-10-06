@@ -17,7 +17,6 @@ local M = {
   license     = "MIT",
   category    = "optional",
   type        = "plugin",
-  essential   = false,
 }
 
 -- Counts runs of non-space characters. Deliberately crude: it is here to

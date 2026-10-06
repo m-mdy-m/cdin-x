@@ -1,12 +1,12 @@
 -- The vim menu itself: its context, and the entries it shows.
 --
--- The menu is built on the generic menu capability (X.core.menu), which
+-- The menu is built on the generic menu capability (menu), which
 -- knows nothing about files, shells or vim. This module only supplies the
 -- context and the entry list; other integrations extend the same menu
 -- through menu.extend (see vim-search, vim-treeview, vim-git).
 local core  = require "core"
 local fs    = require "core.fs"
-local menu  = require "X.core.menu.impl"
+local menu  = require "menu.impl"
 local files = require "X.integration.vim.vim-menu.files"
 
 local M = {}

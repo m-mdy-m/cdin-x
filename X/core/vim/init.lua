@@ -35,10 +35,9 @@ local M = {
   license = "MIT",
   category = "core",
   type = "plugin",
-  essential = true,
   dependencies = {},
   min_cdin_version = "0.5.0",
-  tags = { "essential", "editor", "vim", "input" },
+  tags = { "editor", "vim", "input" },
 }
 M.config = { vim_mode_enabled = true }
 

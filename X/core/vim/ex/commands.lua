@@ -11,7 +11,7 @@
 --   * command.perform("<other-plugin>:<command>") — a command name is a
 --     public interface, so naming one is not a module dependency;
 --   * registry.emit("<event>") — a subscription seam.
--- Anything more (requiring X.core.tab, say) belongs in an integration.
+-- Anything more (requiring workspace.tab, say) belongs in an integration.
 local core    = require "core"
 local command = require "core.input.command"
 local fs      = require "core.fs"

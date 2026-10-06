@@ -25,7 +25,6 @@ local M = {
   license = "MIT",
   category = "integration",
   type = "plugin",
-  essential = false,
   dependencies = { "vim", "menu", "vim-menu" },
   min_cdin_version = "0.5.0",
   tags = { "vim", "plugin-manager", "integration" },
@@ -41,7 +40,7 @@ function M.init()
   loaded = true
 
   local command = require "core.input.command"
-  local menu    = require "X.core.menu.impl"
+  local menu    = require "menu.impl"
 
   require("X.integration.vim.vim-plugin-manager.keymap").register()
 
@@ -61,7 +60,7 @@ end
 function M.unload()
   if not loaded then return end
   require("X.integration.vim.vim-plugin-manager.keymap").unregister()
-  require("X.core.menu.impl").remove_extension("vim.main", SECTION_ID)
+  require("menu.impl").remove_extension("vim.main", SECTION_ID)
   loaded = false
 end
 

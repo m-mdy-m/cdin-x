@@ -2,8 +2,8 @@
 --
 -- The manager does not read this file: it scans the filesystem. It exists
 -- so a consumer can see the whole catalog — and each entry's file list —
--- without walking the tree, and so `essential` is stated once, in the
--- plugin, instead of being repeated in a manifest that can drift from it.
+-- without walking the tree. What a build carries is decided by a bundle in
+-- bundles/, never by a field in a manifest, so nothing here says so.
 local scan = dofile("scripts/_scan.lua")
 
 local function q(s)
@@ -30,7 +30,6 @@ for _, entry in ipairs(scan.plugin_entries()) do
       type = meta.type or "plugin",
       version = meta.version or "0.0.0",
       description = meta.description or "",
-      essential = meta.essential == true,
       dependencies = meta.dependencies or {},
       optional_dependencies = meta.optional_dependencies or {},
       files = entry.single_file and { entry.path } or scan.list_files_recursive(entry.base),
@@ -46,7 +45,6 @@ for _, theme in ipairs(scan.theme_entries()) do
     type = "theme",
     version = "0.1.0",
     description = "Theme: " .. theme.name,
-    essential = theme.data.essential == true,
     files = theme.base and scan.list_files_recursive(theme.base) or { theme.path },
   }
 end
@@ -85,7 +83,6 @@ for _, name in ipairs(names) do
   lines[#lines + 1] = "      type = " .. q(meta.type) .. ","
   lines[#lines + 1] = "      version = " .. q(meta.version) .. ","
   lines[#lines + 1] = "      description = " .. q(meta.description) .. ","
-  lines[#lines + 1] = "      essential = " .. tostring(meta.essential) .. ","
   if meta.dependencies and #meta.dependencies > 0 then
     lines[#lines + 1] = "      dependencies = " .. list(meta.dependencies) .. ","
   end

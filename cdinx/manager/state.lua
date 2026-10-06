@@ -1,4 +1,4 @@
-local fs   = require "core.fs"
+local Host = require "cdinx.host"
 local Util = require "cdinx.manager.util"
 
 local State = {}
@@ -9,7 +9,7 @@ end
 
 function State.load(config)
   local file = config.state_file
-  if not fs.is_file(file) then
+  if not Host.fs.is_file(file) then
     return State.empty()
   end
 
@@ -24,7 +24,7 @@ function State.load(config)
 end
 
 function State.save(config, state)
-  fs.mkdir(Util.parent_dir(config.state_file))
+  Host.fs.mkdir(Util.parent_dir(config.state_file))
   local fp, err = io.open(config.state_file, "w")
   if not fp then return false, err end
 

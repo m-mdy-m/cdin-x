@@ -8,7 +8,7 @@
 -- Every column is measured from the font rather than guessed, because the
 -- version and the status sit at the right edge and a guessed width is how two
 -- labels end up printed on top of each other.
-local core   = require "core"
+local Host = require "cdinx.host"
 local common = require "core.utils.common"
 local style  = require "core.style"
 local View   = require "core.views.view"
@@ -80,7 +80,7 @@ function PanelView:get_name() return "Extensions" end
 
 function PanelView:invalidate()
   self._dirty = true
-  core.redraw = true
+  Host.core.redraw = true
 end
 
 function PanelView:_ensure_rows()
@@ -95,7 +95,7 @@ function PanelView:_ensure_rows()
   -- Keep the cursor on the same entry when the list changed underneath it,
   -- and on an entry when it did not.
   self.row  = Rows.nearest(self.rows, self.row)
-  core.redraw  = true
+  Host.core.redraw  = true
 end
 
 function PanelView:refilter()
@@ -112,7 +112,7 @@ function PanelView:refilter()
   self._dirty  = false
   self.row  = Rows.nearest(self.rows, 1)
   self.scroll.to.y = 0
-  core.redraw = true
+  Host.core.redraw = true
 end
 
 function PanelView:_row_selectable(i)
@@ -145,7 +145,7 @@ end
 function PanelView:set_row(i)
   self.row = i
   self:scroll_to_cursor()
-  core.redraw = true
+  Host.core.redraw = true
 end
 
 function PanelView:scroll_to_cursor()
@@ -251,7 +251,7 @@ function PanelView:on_mouse_moved(px, py, ...)
   -- `row`. They were once the same field, and every mouse move over the panel
   -- handed the row number to system.set_cursor().
   self.cursor = self.hovered and "hand" or "arrow"
-  core.redraw = true
+  Host.core.redraw = true
 end
 
 function PanelView:on_mouse_pressed(button, x, y, clicks)
@@ -287,8 +287,8 @@ end
 
 local function band(self, height, color)
   if height <= 0 then return 0 end
-  renderer.draw_rect(self.position.x, self.position.y, self.size.x, height, color)
-  renderer.draw_rect(self.position.x, self.position.y + height - style.divider_size,
+  Host.renderer.draw_rect(self.position.x, self.position.y, self.size.x, height, color)
+  Host.renderer.draw_rect(self.position.x, self.position.y + height - style.divider_size,
     self.size.x, style.divider_size, style.divider)
   return height
 end
@@ -298,7 +298,7 @@ function PanelView:_draw_title()
   local lh = self:get_item_height()
   local h = self:get_title_height()
 
-  renderer.draw_rect(self.position.x, self.position.y, self.size.x, h,
+  Host.renderer.draw_rect(self.position.x, self.position.y, self.size.x, h,
     style.background2)
 
   local counts = self.counts or {}
@@ -313,7 +313,7 @@ function PanelView:_draw_title()
   common.draw_text(font, style.dim, summary, "right", x,
     self.position.y + style.padding.y, w, lh)
 
-  renderer.draw_rect(self.position.x, self.position.y + h - style.divider_size,
+  Host.renderer.draw_rect(self.position.x, self.position.y + h - style.divider_size,
     self.size.x, style.divider_size, style.divider)
   return h
 end
@@ -324,7 +324,7 @@ function PanelView:_draw_filter()
 
   local font = style.font
   local lh = self:get_item_height()
-  renderer.draw_rect(self.position.x, self.position.y + self:get_title_height(),
+  Host.renderer.draw_rect(self.position.x, self.position.y + self:get_title_height(),
     self.size.x, h, style.background)
 
   local x = self.position.x + style.padding.x
@@ -338,7 +338,7 @@ function PanelView:_draw_filter()
 
   if self.searching then
     local cx = x + font:get_width(text)
-    renderer.draw_rect(math.floor(cx + 2), y + 2, math.max(1, math.floor(SCALE)),
+    Host.renderer.draw_rect(math.floor(cx + 2), y + 2, math.max(1, math.floor(Host.scale)),
       font:get_height() - 4, style.accent)
   end
 
@@ -355,8 +355,8 @@ function PanelView:_draw_footer()
   local h = self:get_footer_height()
   local y = self.position.y + self.size.y - h
 
-  renderer.draw_rect(self.position.x, y, self.size.x, h, style.background2)
-  renderer.draw_rect(self.position.x, y, self.size.x, style.divider_size,
+  Host.renderer.draw_rect(self.position.x, y, self.size.x, h, style.background2)
+  Host.renderer.draw_rect(self.position.x, y, self.size.x, style.divider_size,
     style.divider)
 
   local hints = self.searching
@@ -405,10 +405,10 @@ function PanelView:_draw_entry(row, index, x, y, w, h)
   local hovered  = index == self.hovered
 
   if selected then
-    renderer.draw_rect(x, y, w, h, style.line_highlight)
-    renderer.draw_rect(x, y, math.ceil(2 * SCALE), h, style.accent)
+    Host.renderer.draw_rect(x, y, w, h, style.line_highlight)
+    Host.renderer.draw_rect(x, y, math.ceil(2 * Host.scale), h, style.accent)
   elseif hovered then
-    renderer.draw_rect(x, y, w, h, style.line_highlight)
+    Host.renderer.draw_rect(x, y, w, h, style.line_highlight)
   end
 
   -- Right column first: its width is what the name column gets, and it is
@@ -436,9 +436,9 @@ function PanelView:_draw_entry(row, index, x, y, w, h)
   if status == "editor" or status == "available" then color = style.dim end
   if status == "disabled" then color = style.dim end
   if name_w > 10 then
-    core.push_clip_rect(name_x, y, name_w, h)
+    Host.core.push_clip_rect(name_x, y, name_w, h)
     common.draw_text(font, color, entry.name or "", nil, name_x, y, name_w, h)
-    core.pop_clip_rect()
+    Host.core.pop_clip_rect()
   end
 end
 
@@ -451,7 +451,7 @@ function PanelView:draw()
   local top = self:get_list_top()
   local bottom = self.size.y - self:get_footer_height()
 
-  core.push_clip_rect(self.position.x, top + self.position.y, self.size.x,
+  Host.core.push_clip_rect(self.position.x, top + self.position.y, self.size.x,
     math.max(0, bottom - top))
   for index, row, x, y, w, h in self:each_row() do
     if y + h >= top and y < bottom then
@@ -468,7 +468,7 @@ function PanelView:draw()
       end
     end
   end
-  core.pop_clip_rect()
+  Host.core.pop_clip_rect()
 
   self:draw_scrollbar()
   self:_draw_footer()

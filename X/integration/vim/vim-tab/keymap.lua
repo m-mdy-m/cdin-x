@@ -10,11 +10,11 @@ local M = {}
 
 local GMAP = {
   gt = function(count)
-    local tabs = require "X.core.tab.manager"
+    local tabs = require "workspace.tab.manager"
     if count then tabs.go_to(count) else tabs.next() end
   end,
   gT = function()
-    require("X.core.tab.manager").prev()
+    require("workspace.tab.manager").prev()
   end,
 }
 

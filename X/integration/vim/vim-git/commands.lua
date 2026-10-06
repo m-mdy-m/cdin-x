@@ -1,6 +1,6 @@
 -- Git commands for vim mode.
 --
--- Each one runs a recipe from X.core.git.recipes through vim's shell
+-- Each one runs a recipe from git.recipes through vim's shell
 -- capability, so the output shows up in a scratch buffer exactly as :!git
 -- status would.
 --
@@ -16,7 +16,7 @@ local M = {}
 
 local function run(recipe)
   return function()
-    local git = require "X.core.git.api"
+    local git = require "git.api"
     require("X.core.vim.shell").run_in_buffer(git.recipes[recipe])
   end
 end

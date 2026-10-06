@@ -1,5 +1,5 @@
 -- CDIN-X Plugin Manager UI.
-local core    = require "core"
+local Host    = require "cdinx.host"
 local command = require "core.input.command"
 local Manager = require "cdinx.manager"
 
@@ -29,7 +29,7 @@ local function filter_text(text)
 end
 
 local function open_items(title, items, submit)
-  core.command_view:enter(title, submit, function(text)
+  Host.core.command_view:enter(title, submit, function(text)
     local q = filter_text(text):lower()
     if q == "" then return items end
     local out = {}
@@ -120,8 +120,8 @@ function Command.show_catalog()
       Command.show_details(plugin.name)
     else
       local ok,err=Manager.install(plugin.name)
-      if ok then core.log("Installed %s",plugin.name)
-      else core.error("cdin-x: %s",err) end
+      if ok then Host.core.log("Installed %s",plugin.name)
+      else Host.core.error("cdin-x: %s",err) end
     end
   end)
 end
@@ -135,13 +135,13 @@ function Command.show_details(name)
   local items={
     {text="Open README",info=plugin.description,action=function()
       local ok,err=Manager.open_readme(name)
-      if not ok then core.error("cdin-x: %s",err) end
+      if not ok then Host.core.error("cdin-x: %s",err) end
     end},
   }
 
   if Manager.is_locked(name) or plugin.essential then
     items[#items+1]={text="Locked",info="Part of the editor, and cannot be removed",action=function()
-      core.log("%s is built into the editor",name)
+      Host.core.log("%s is built into the editor",name)
     end}
   elseif installed or disabled then
     items[#items+1]={text=disabled and "Enable" or "Disable",
@@ -149,25 +149,25 @@ function Command.show_details(name)
       action=function()
         local ok,err
         if disabled then ok,err=Manager.enable(name) else ok,err=Manager.disable(name) end
-        if not ok then core.error("cdin-x: %s",err) else core.log("%s updated",name) end
+        if not ok then Host.core.error("cdin-x: %s",err) else Host.core.log("%s updated",name) end
       end}
     items[#items+1]={text="Update",info="Re-fetch from the registry if a newer version exists",
       action=function()
         local ok,result=Manager.update(name)
-        if ok and #result.updated>0 then core.log("Updated %s",name)
-        elseif ok then core.log("%s is already up to date",name)
-        else core.error("cdin-x: %s",result.errors and table.concat(result.errors,"; ") or "update failed") end
+        if ok and #result.updated>0 then Host.core.log("Updated %s",name)
+        elseif ok then Host.core.log("%s is already up to date",name)
+        else Host.core.error("cdin-x: %s",result.errors and table.concat(result.errors,"; ") or "update failed") end
       end}
     items[#items+1]={text="Uninstall",info="Remove the installed extension",
       action=function()
         local ok,err=Manager.uninstall(name)
-        if not ok then core.error("cdin-x: %s",err) else core.log("Uninstalled %s",name) end
+        if not ok then Host.core.error("cdin-x: %s",err) else Host.core.log("Uninstalled %s",name) end
       end}
   else
     items[#items+1]={text="Install",info="Copy into the local extension store",
       action=function()
         local ok,err=Manager.install(name)
-        if not ok then core.error("cdin-x: %s",err) else core.log("Installed %s",name) end
+        if not ok then Host.core.error("cdin-x: %s",err) else Host.core.log("Installed %s",name) end
       end}
   end
 
@@ -195,7 +195,7 @@ function Command.show_installed()
 end
 
 function Command.show_search()
-  core.command_view:enter("Search CDIN-X",function(text,item)
+  Host.core.command_view:enter("Search CDIN-X",function(text,item)
     if item and item._plugin then Command.show_details(item._plugin.name) end
   end,function(text)
     local results=Manager.search(filter_text(text))
@@ -209,11 +209,11 @@ function Command.show_search()
 end
 
 function Command.show_install_local()
-  core.command_view:enter("Install local extension path",function(path)
+  Host.core.command_view:enter("Install local extension path",function(path)
     path=filter_text(path)
     if path=="" then return end
     local ok,err=Manager.install_local(path)
-    if not ok then core.error("cdin-x: %s",err) else core.log("Installed local extension") end
+    if not ok then Host.core.error("cdin-x: %s",err) else Host.core.log("Installed local extension") end
   end,function(text)
     return require("core.utils.common").path_suggest(text or "")
   end)
@@ -222,20 +222,20 @@ end
 function Command.show_update_all()
   local ok,result=Manager.update()
   if #result.updated>0 then
-    core.log("cdin-x: updated %s",table.concat(result.updated,", "))
+    Host.core.log("cdin-x: updated %s",table.concat(result.updated,", "))
   else
-    core.log("cdin-x: everything installed is already up to date")
+    Host.core.log("cdin-x: everything installed is already up to date")
   end
   if not ok then
-    core.error("cdin-x: %s",table.concat(result.errors,"; "))
+    Host.core.error("cdin-x: %s",table.concat(result.errors,"; "))
   end
 end
 
 function Command.show_clean()
   local ok,orphaned=Manager.clean(true)
-  if not ok then core.error("cdin-x: %s",tostring(orphaned)); return end
+  if not ok then Host.core.error("cdin-x: %s",tostring(orphaned)); return end
   if #orphaned==0 then
-    core.log("cdin-x: nothing to clean — no orphaned installed extensions")
+    Host.core.log("cdin-x: nothing to clean — no orphaned installed extensions")
     return
   end
 
@@ -244,10 +244,10 @@ function Command.show_clean()
     info=table.concat(orphaned,", "),
     action=function()
       local rok,result=Manager.clean(false)
-      if #result.removed>0 then core.log("cdin-x: removed %s",table.concat(result.removed,", ")) end
-      if not rok then core.error("cdin-x: %s",table.concat(result.errors,"; ")) end
+      if #result.removed>0 then Host.core.log("cdin-x: removed %s",table.concat(result.removed,", ")) end
+      if not rok then Host.core.error("cdin-x: %s",table.concat(result.errors,"; ")) end
     end}
-  items[#items+1]={text="Cancel",info="",action=function() core.log("cdin-x: clean cancelled") end}
+  items[#items+1]={text="Cancel",info="",action=function() Host.core.log("cdin-x: clean cancelled") end}
   open_items("Clean CDIN-X",items,function(text,item)
     if item and item.action then item.action() end
   end)
@@ -256,10 +256,10 @@ end
 function Command.show_refresh()
   local ok,err=Manager.refresh_registry()
   if ok then
-    core.log("cdin-x catalog refreshed")
+    Host.core.log("cdin-x catalog refreshed")
     Command.show_catalog()
   else
-    core.error("cdin-x: %s",err)
+    Host.core.error("cdin-x: %s",err)
   end
 end
 
