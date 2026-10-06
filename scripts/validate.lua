@@ -153,6 +153,26 @@ local function owner_of(module_name)
   return best_name
 end
 
+--- A file's path relative to the package it is in, in forward slashes.
+---
+--- The key a manifest's `with` table is written in is a path like `with/themes.lua`,
+--- and a rule about "the file the manifest named" has to compare it against
+--- something. Normalising both to forward slashes is what makes the comparison
+--- work on Windows, where `files_under` hands back backslashes and the manifest
+--- does not.
+--- @param entry table  a catalog entry, carrying `base`
+--- @param path string  an absolute path from `files_under`
+--- @return string|nil
+local function relpath_of(entry, path)
+  local base = tostring(entry.base or ""):gsub("\\", "/")
+  if base:sub(-1) == "/" then base = base:sub(1, -2) end
+  local p = path:gsub("\\", "/")
+  if base ~= "" and p:sub(1, #base + 1) == base .. "/" then
+    return p:sub(#base + 2)
+  end
+  return nil
+end
+
 local function x_requires(path)
   local f = io.open(path, "rb")
   if not f then return {} end
@@ -228,6 +248,13 @@ end
 --                                  private.
 --   no cross-package require at all unless declared, same as above.
 --
+-- A `with` entry is the one exemption, and it is a narrow one. A `with` file is
+-- allowed to reach into the package its manifest named -- that is what it is for,
+-- it exists to wire two packages together that cannot know about each other -- but
+-- only that one, and only from the file the manifest named. Every other file in the
+-- package is under the same rules as before, so the exemption cannot become a
+-- general permission to reach in.
+--
 -- The two forms live in one tree during the move, so this is checked only for
 -- packages that ship a package.lua; the rest keep the path-shaped rules above.
 for name, entry in pairs(known) do
@@ -235,18 +262,31 @@ for name, entry in pairs(known) do
     local prefix = module_prefix(entry)
     local declared = {}
     for _, d in ipairs(entry.meta.dependencies or {}) do declared[d] = true end
+    -- rel -> the partner that file is allowed to reach into, if it is a with file
+    local with_partner = {}
+    for partner, rel in pairs(entry.meta.with or {}) do
+      with_partner[(rel:gsub("\\", "/"))] = partner
+    end
     local files = entry.single_file and { entry.path } or files_under(entry.base)
     for _, f in ipairs(files) do
+      local rel = relpath_of(entry, f)
+      local partner = rel and with_partner[rel] or nil
       for _, mod in ipairs(requires_of(f)) do
         local owner = owner_of(mod)
         if owner and owner ~= name then
-          if mod == prefix then
+          if partner and owner == partner then
+            -- the one reach a with entry exists to make
+          elseif mod == prefix then
             -- the owner's own root module, required from outside itself
           elseif not declared[owner] then
             errors[#errors+1] = string.format(
               "%s requires %s, owned by %q, without declaring it: %s", name, mod, owner, f)
           elseif mod:sub(1, #owner + 1) ~= owner .. "." then
             -- nothing: mod is the owner's root module
+          elseif partner then
+            errors[#errors+1] = string.format(
+              "%s is a with entry for %q but reaches %s, owned by %q — a with file may only reach the package it named: %s",
+              name, partner, mod, owner, f)
           else
             errors[#errors+1] = string.format(
               "%s requires %s, a submodule of %q — a dependency is used through its root module only: %s",

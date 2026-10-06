@@ -121,9 +121,20 @@ end
 -- ── R8: declared features and with-entries exist and say what they promise ──
 local function check_declared_files(spec, dir, errors)
   for key, rel in pairs(spec.with or {}) do
+    if key == spec.name then
+      errors[#errors+1] = string.format(
+        "with[%q] names its own package; a with entry is between two packages", key)
+    end
     local path = dir .. "/" .. rel
     if not exists(path) then
       errors[#errors+1] = string.format("with[%q] names %q, which is not in the package", key, rel)
+    else
+      -- Same promise a feature makes, and for the same reason: `disable_all` and
+      -- `partner_left` call `disable` and have nothing else to fall back on.
+      local body = strip_comments(read(path) or "")
+      if not body:find("enable") or not body:find("disable") then
+        errors[#errors+1] = string.format("%s must define enable() and disable()", rel)
+      end
     end
   end
   for key in pairs(spec.features or {}) do

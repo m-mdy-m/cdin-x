@@ -4,6 +4,7 @@ local Util   = require "cdinx.manager.util"
 local Deps   = require "cdinx.manager.deps"
 local Loader = require "cdinx.manager.loader"
 local Features = require "cdinx.manager.features"
+local With = require "cdinx.manager.with"
 
 local Runtime = {}
 
@@ -147,6 +148,18 @@ function Runtime.load_plugin(ctx, name)
   end
 
   ctx.installed[name] = mod
+
+  -- `with` last, and only once this package counts as installed: an entry is
+  -- enabled by a partner that is already up, and until `installed[name]` is set
+  -- the package is not one. Then the other half -- the packages already up that
+  -- named *this* one -- which can only be offered the seam after it exists.
+  for _, problem in ipairs(With.apply(ctx, name, plugin.spec)) do
+    Host.core.error("cdin-x: %s", problem)
+  end
+  for _, problem in ipairs(With.partner_arrived(ctx, name)) do
+    Host.core.error("cdin-x: %s", problem)
+  end
+
   return true
 end
 
@@ -154,10 +167,27 @@ function Runtime.unload_plugin(ctx, name)
   local mod = ctx.installed[name]
   if not mod then return true end
 
+  -- A `with` entry is enabled after this package's own features, because it sits
+  -- on top of both packages, so it comes down before them: the same reasoning as
+  -- features going down before `unload`, one level up. A seam torn down after the
+  -- features it was holding would be a seam unsubscribing from a table that has
+  -- already been emptied.
+  local seam_problems = With.disable_all(ctx, name)
+
   -- Features come down before the package does, and in reverse of the order they
   -- went up. A feature may depend on something its package's init put in place,
   -- so undoing it first is the only order that is right.
   local problems = Features.disable_all(ctx, name)
+
+  -- The packages wired to *this* one lose their seams too. They are still loaded,
+  -- so `partner_left` finds them; this is what makes a seam belong to both sides
+  -- rather than to whichever happened to be loaded last.
+  for _, p in ipairs(With.partner_left(ctx, name)) do
+    problems[#problems + 1] = p
+  end
+  for _, p in ipairs(seam_problems) do
+    problems[#problems + 1] = p
+  end
 
   if mod.unload then
     local ok, err = pcall(mod.unload)

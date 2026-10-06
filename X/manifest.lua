@@ -25,6 +25,7 @@ return {
     "cdinx/manager/runtime.lua",
     "cdinx/manager/state.lua",
     "cdinx/manager/util.lua",
+    "cdinx/manager/with.lua",
     "cdinx/manifest.lua",
     "cdinx/panel/commands.lua",
     "cdinx/panel/init.lua",

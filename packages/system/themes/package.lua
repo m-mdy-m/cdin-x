@@ -24,11 +24,15 @@ return {
     },
   },
 
-  -- Runs only when `session` is active too, and is undone when either side goes
-  -- away. Phase 5 teaches the kernel what a `with` entry is; until then this is
-  -- declared and validated but not run.
+  -- Runs only when `workspace` is active -- which is to say when its `session`
+  -- feature is, since `session` is not a package of its own any more -- and is
+  -- undone when either side goes away.
+  --
+  -- The key is a *package* name, not a feature name. That is what makes the rule
+  -- checkable: validate.lua can see that a `with` file reaches into exactly the
+  -- package its manifest named, and nowhere else.
   with = {
-    session = "with/themes.lua",
+    workspace = "with/themes.lua",
   },
 
   entry = "init.lua",
