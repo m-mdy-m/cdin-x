@@ -1,9 +1,11 @@
 -- Every panel command, in one file, with its predicate.
-local Host    = require "cdinx.host"
-local common  = require "core.utils.common"
-local command = require "core.input.command"
-local Manager = require "cdinx.manager"
-local Command = require "cdinx.command"
+local Host     = require "cdinx.host"
+local common   = require "core.utils.common"
+local command  = require "core.input.command"
+local Manager  = require "cdinx.manager"
+local Command  = require "cdinx.command"
+local Packages = require "cdinx.packages"
+local config   = require "cdinx.config"
 
 local M = {}
 
@@ -32,6 +34,17 @@ local function current()
     Host.core.log("extensions: nothing selected")
   end
   return entry
+end
+
+--- The feature row under the cursor, or nil.
+---
+--- Separate from `current` because the two are different targets: `entry_at_cursor`
+--- skips a feature row and lands on the package above it, which is right for the
+--- package commands and wrong for this one. Asking the row directly is what makes
+--- the difference visible instead of guessed.
+local function feature_at_cursor()
+  if not view or not view.row then return nil end
+  return view:feature_at(view.row)
 end
 
 local function report(ok, err)
@@ -82,6 +95,67 @@ function M.resize(dir)
 end
 
 -- ── actions on the selected extension ────────────────────────────────────
+
+-- Turns one feature of the selected package on or off, and records it.
+--
+-- This is the write half of what `packages.lua` was added for. Two things have to
+-- be right or the switch lies:
+--
+--   The change is persisted *before* the row is redrawn. A switch that works this
+--   session and reverts on restart is the single most confusing thing a panel can
+--   offer, and it looks exactly like a save that failed.
+--
+--   The package is loaded and unloaded around it. Setting the flag alone changes
+--   nothing until the next start, which is the same lie in a slower form.
+--
+-- The row refreshes afterwards whether or not it worked, because a switch that
+-- failed to save must not be left drawn in its new position.
+function M.toggle_feature()
+  local row = feature_at_cursor()
+  if not row then
+    -- The cursor is on a package rather than a feature. Space keeps meaning
+    -- install/enable/disable, which is the operation people reach for; features
+    -- are reached from the package's own detail view.
+    local entry = current()
+    if entry and #(entry.features or {}) > 0 then
+      Host.core.log(
+        "extensions: %s has %d feature(s) -- press enter on it to choose one",
+        entry.name, #entry.features)
+    end
+    return
+  end
+
+  local name, key = row.feature.name, row.feature.key
+  local new_value = not row.feature.on
+
+  local data = Packages.load(config)
+  local for_package = data.features[name]
+  if type(for_package) ~= "table" then
+    for_package = {}
+    data.features[name] = for_package
+  end
+  for_package[key] = new_value
+
+  local ok, err = Packages.write(config)
+  if not ok then
+    Host.core.error("extensions: could not save %s: %s", name, tostring(err))
+    view:invalidate()
+    return
+  end
+  Host.core.log("extensions: %s.%s %s", name, key, new_value and "on" or "off")
+
+  -- Apply it now, so the switch is not a promise about the next session. Reload
+  -- rather than push at the individual feature: `Features` owns enable and
+  -- disable, and reaching past it would register a second copy of something.
+  local applied = Manager.apply_feature(name, key, new_value)
+  if not applied then
+    Host.core.error(
+      "extensions: %s.%s is now %s, but not until the next start",
+      name, key, new_value and "on" or "off")
+  end
+
+  view:invalidate()
+end
 
 function M.toggle_cursor()
   local entry = current()
@@ -230,6 +304,10 @@ local BROWSING = {
   ["pluginmanager:select-next"]      = function() view:move_cursor(1) end,
   ["pluginmanager:activate-cursor"]  = "toggle_cursor",
   ["pluginmanager:toggle-cursor"]    = "toggle_cursor",
+  -- On a package this is what space has always done; on a feature row it is the
+  -- feature's own switch. `toggle_feature` says so in its log line when the cursor
+  -- is on a package, rather than quietly doing nothing.
+  ["pluginmanager:toggle-feature"]   = "toggle_feature",
   ["pluginmanager:install-cursor"]   = "install_cursor",
   ["pluginmanager:uninstall-cursor"] = "uninstall_cursor",
   ["pluginmanager:open-details"]     = "details",
@@ -269,8 +347,12 @@ function M.register()
 end
 
 function M.unregister()
-  local names = { "pluginmanager:toggle", "pluginmanager:open",
-    "pluginmanager:close", "pluginmanager:menu" }
+  -- Built from the tables rather than written out, because a hand-written list
+  -- drifts: `pluginmanager:menu` was in it and is registered nowhere, and
+  -- `pluginmanager:open` was missing. Iterating the maps cannot be wrong in that
+  -- direction, and the loop is the whole point.
+  local names = {}
+  for name in pairs(PERSISTENT) do names[#names + 1] = name end
   for name in pairs(BROWSING) do names[#names + 1] = name end
   for name in pairs(SEARCHING) do names[#names + 1] = name end
   command.remove(names)

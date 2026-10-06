@@ -139,7 +139,9 @@ function Command.show_details(name)
     end},
   }
 
-  if Manager.is_locked(name) or plugin.essential then
+  -- `or plugin.essential` was dead weight: no package may declare that field, so
+  -- it was always false. `is_locked` is the whole test.
+  if Manager.is_locked(name) then
     items[#items+1]={text="Locked",info="Part of the editor, and cannot be removed",action=function()
       Host.core.log("%s is built into the editor",name)
     end}

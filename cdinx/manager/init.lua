@@ -8,6 +8,8 @@ local Registry  = require "cdinx.manager.registry"
 local State     = require "cdinx.manager.state"
 local Catalog   = require "cdinx.manager.catalog"
 local Runtime   = require "cdinx.manager.runtime"
+local Features  = require "cdinx.manager.features"
+local Packages  = require "cdinx.packages"
 local Fetch     = require "cdinx.manager.fetch"
 local Lifecycle = require "cdinx.manager.lifecycle"
 
@@ -152,7 +154,11 @@ function Manager.bootstrap()
   -- The user's own choices, read once here so the config is known before any
   -- package asks what its features should be. Problems are logged rather than
   -- raised: a packages.lua with a typo in it must not stop the editor starting.
-  local Packages = require "cdinx.packages"
+  -- `Packages` is the module-level upvalue from the top of this file. Re-requiring
+  -- it here shadowed it with a second table, and the shadowed copy is the one that
+  -- gets primed with this config while `apply_feature` -- which reads the upvalue --
+  -- would have found empty. The two would then disagree about whether the user had
+  -- said anything, which is a switch that works when written and not when read.
   local _, problems = Packages.load(config)
   for _, problem in ipairs(problems) do
     Host.core.log("cdin-x: %s", problem)
@@ -265,6 +271,19 @@ function Manager.get(name)
   return Manager.available[name]
 end
 
+--- The live context, for a caller that has to agree with the runtime about
+--- something the runtime owns.
+---
+--- The panel needs this to read which features are *running*, which is not a
+--- question the catalog can answer: `Features.active` consults the table the
+--- runtime registers into, and there is exactly one of those. Handing it out is
+--- better than having the panel build a context of its own, which would answer
+--- about a session that is not running -- and would say so, confidently.
+--- @return table
+function Manager.context()
+  return ctx
+end
+
 function Manager.get_status(name)
   local plugin = Manager.available[name]
   if not plugin then return "missing" end
@@ -310,21 +329,97 @@ function Manager.open_readme(name)
   return false, "README not found"
 end
 
-function Manager.get_essential_names()
+-- Every package the user has switched off, whatever its source.
+--
+-- This replaces `get_essential_names`, which collected `plugin.essential == true` --
+-- a field that no package may declare any more (schema, validate and check all
+-- refuse it, and there is no `essential` left anywhere to set). So the function
+-- returned an empty list to every caller, permanently and without complaint. It
+-- was one of three places still reading a field the architecture deleted.
+--
+-- What the panel wants to draw as "always on" is a *build* package: something the
+-- bundle shipped, which is not removable and not switchable, because the host
+-- loads it. That is `is_locked`, and it is what the panel already uses.
+function Manager.get_locked_names()
   merge_sources()
   local names = {}
-  for name, plugin in pairs(Manager.available) do
-    if plugin.essential == true then
-      names[#names + 1] = name
-    end
+  for name in pairs(Manager.available) do
+    if Manager.is_locked(name) then names[#names + 1] = name end
   end
   table.sort(names)
   return names
 end
 
-function Manager.is_essential(name)
+-- ── features ───────────────────────────────────────────────────────────
+
+--- Turns one feature of a loaded package on or off, now.
+--
+--- The panel's switch. The flag is already written to `packages.lua` by the time
+--- this is called; this is the part that makes the next frame reflect it, rather
+--- than the next start.
+--
+--- A feature is only reachable while its package is loaded, because the package's
+--- `init` is what puts in place whatever the feature sits on. So turning one on
+--- requires the package to be up, and turning one off requires it to still be up.
+-- Both are checked rather than assumed: a switch that appears to work on an
+--- unloaded package is worse than one that says it cannot.
+--- @param name string
+--- @param key string
+--- @param on boolean
+--- @return boolean ok
+--- @return string|nil err
+function Manager.apply_feature(name, key, on)
+  -- Re-read the catalog. The panel calls this against a name it saw in the list, and
+  -- between that draw and this keypress the list may have been rebuilt -- a rescan
+  -- after an install, or a refresh from the panel itself. Reading a stale
+  -- `Manager.available` would answer about a package that is no longer there.
+  merge_sources()
+
   local plugin = Manager.available[name]
-  return plugin ~= nil and plugin.essential == true
+  if not plugin then return false, "unknown extension: " .. name end
+
+  local spec = plugin.spec
+  if not spec or not Features.has_any(spec) then
+    return false, name .. " has no features"
+  end
+
+  -- Refuse an unknown key rather than reporting success. The panel can only offer a
+  -- declared feature, so this is a caller error -- and a feature that "turned off"
+  -- without existing is exactly the kind of thing that is never noticed.
+  local declared = false
+  for _, f in ipairs(Features.declared(spec)) do
+    if f.key == key then declared = true break end
+  end
+  if not declared then
+    local available = {}
+    for _, f in ipairs(Features.declared(spec)) do available[#available + 1] = f.key end
+    table.sort(available)
+    return false, string.format("%s has no feature %q; it has %s", name, key,
+      #available > 0 and table.concat(available, ", ") or "none")
+  end
+
+  if not ctx.installed[name] then
+    if on then
+      return false, name .. " is not loaded, so its features cannot be switched on"
+    end
+    -- Off, and it is already not running: the switch has nothing to undo and the
+    -- answer is the one the user wanted.
+    return true
+  end
+
+  if on then
+    -- Enable needs the package's merged options, which is what `apply` would have
+    -- passed. Recomputing here is deliberate rather than a shortcut: the options
+    -- are `spec.options` plus the user's overrides, and Features owns that merge.
+    local options = Features.options(spec, Packages.feature_overrides(name))
+    local mod, err = Features.enable(ctx, name, key, options)
+    if not mod then return false, err end
+    return true
+  end
+
+  local ok, err = Features.disable(ctx, name, key)
+  if not ok then return false, err end
+  return true
 end
 
 -- ── runtime (load/unload) ──────────────────────────────────────────────

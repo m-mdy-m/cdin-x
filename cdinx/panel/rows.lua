@@ -92,10 +92,23 @@ function Rows.build(entries, query, notice)
     rows[#rows + 1] = { kind = "section", key = key, label = label,
       count = counts[key] }
 
+    -- A package's features, indented under it.
+    --
+    -- A helper rather than inline in both branches, because there are two branches
+    -- and a feature row added to only one of them is a feature that appears under
+    -- an installed package and vanishes under a build one -- which is exactly where
+    -- the packages with the most features are: vim, the workspace.
+    local function emit(entry)
+      rows[#rows + 1] = { kind = "entry", entry = entry }
+      for _, feature in ipairs(entry.features or {}) do
+        rows[#rows + 1] = { kind = "feature", entry = entry, feature = feature }
+      end
+    end
+
     if not with_categories then
       table.sort(list, by_name)
       for _, entry in ipairs(list) do
-        rows[#rows + 1] = { kind = "entry", entry = entry }
+        emit(entry)
       end
       return
     end
@@ -125,7 +138,7 @@ function Rows.build(entries, query, notice)
       rows[#rows + 1] = { kind = "category",
         label = Rows.CATEGORY_NAMES[cat] or cat }
       for _, entry in ipairs(group[cat]) do
-        rows[#rows + 1] = { kind = "entry", entry = entry }
+        emit(entry)
       end
     end
   end

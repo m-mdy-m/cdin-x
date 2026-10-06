@@ -120,6 +120,28 @@ function PanelView:_row_selectable(i)
   return row ~= nil and row.kind == "entry"
 end
 
+--- The row at an index, after making sure it exists.
+---
+--- Added because a caller asking "what is under the cursor" otherwise has to
+--- reach into `self.rows` and call `_ensure_rows` first, and getting that order
+--- wrong means reading a stale row -- which for a switch is a toggle applied to the
+--- wrong feature.
+--- @param i number
+--- @return table|nil
+function PanelView:row_at(i)
+  self:_ensure_rows()
+  return self.rows[i]
+end
+
+--- The feature row at an index, or nil.
+--- @param i number
+--- @return table|nil
+function PanelView:feature_at(i)
+  local row = self:row_at(i)
+  if row and row.kind == "feature" then return row end
+  return nil
+end
+
 function PanelView:_next_entry(from, dir)
   local i = from
   while i >= 1 and i <= #self.rows do
@@ -361,7 +383,7 @@ function PanelView:_draw_footer()
 
   local hints = self.searching
     and "type to filter   backspace delete   enter keep   esc done"
-    or  "j/k move   / search   space on/off   i install   u remove   ? more"
+    or  "j/k move   / search   space on/off   f feature   i install   u remove   ? more"
   common.draw_text(font, style.dim, hints, nil,
     self.position.x + style.padding.x, y + style.padding.y,
     self.size.x - style.padding.x * 2, lh)
@@ -418,6 +440,20 @@ function PanelView:_draw_entry(row, index, x, y, w, h)
   if entry.version and entry.version ~= "" then
     right = entry.version .. "   " .. label
   end
+  -- A package with features says so, and says how many are off. Without this the
+  -- feature rows below it are the only sign, which means a user has to scroll to
+  -- discover that a package is divisible at all -- and the count of *off* ones is
+  -- the thing worth reading before expanding it.
+  local features = entry.features
+  if features and #features > 0 then
+    local off = 0
+    for _, feature in ipairs(features) do
+      if not feature.on then off = off + 1 end
+    end
+    if off > 0 then
+      right = string.format("%d/%d off   ", off, #features) .. right
+    end
+  end
   local rw = font:get_width(right)
   common.draw_text(font, status_color(status), right, "right",
     x, y, w - style.padding.x, h)
@@ -438,6 +474,51 @@ function PanelView:_draw_entry(row, index, x, y, w, h)
   if name_w > 10 then
     Host.core.push_clip_rect(name_x, y, name_w, h)
     common.draw_text(font, color, entry.name or "", nil, name_x, y, name_w, h)
+    Host.core.pop_clip_rect()
+  end
+end
+
+--- A feature row: indented under its package, dim, and read-only.
+---
+--- Deliberately not selectable. Pressing space on a package installs, enables or
+--- disables it; that is the operation with a lifecycle behind it and the one users
+--- reach for. A feature is a switch *inside* the package, and making it a target
+--- of the same key would mean one key doing two unrelated things depending on
+--- which kind of row the cursor happened to be on. It is drawn because a user
+--- cannot turn off what they cannot see.
+function PanelView:_draw_feature(row, index, x, y, w, h)
+  local font    = style.font
+  local feature = row.feature
+  if not feature then return end
+
+  local hovered = index == self.hovered
+  if hovered then
+    Host.renderer.draw_rect(x, y, w, h, style.line_highlight)
+  end
+
+  -- "on"/"off" rather than a tick: it is a word the panel already uses everywhere
+  -- else, and a switch that is off is the thing being read.
+  local right = feature.on and "on" or "off"
+  local rw = font:get_width(right)
+  common.draw_text(font, feature.on and style.git_added or style.git_modified,
+    right, "right", x, y, w - style.padding.x, h)
+
+  -- Two indents past the name column, so the relationship is visible without the
+  -- row needing to be selected to make sense.
+  local name_x = x + style.padding.x * 4 + math.ceil(font:get_width("M"))
+  local name_w = w - (name_x - x) - rw - style.padding.x * 2
+
+  -- Dim for a default, full colour for a choice. That difference is the whole
+  -- point of the row: it shows which switches are the user's.
+  local color = style.dim
+  if feature.chosen then color = style.text end
+  -- On but not running is a third state, and it is the one worth noticing: the
+  -- feature was asked for and could not start.
+  if feature.on and not feature.running then color = style.git_modified end
+
+  if name_w > 10 then
+    Host.core.push_clip_rect(name_x, y, name_w, h)
+    common.draw_text(font, color, feature.label or "", nil, name_x, y, name_w, h)
     Host.core.pop_clip_rect()
   end
 end
@@ -463,6 +544,8 @@ function PanelView:draw()
         draw_empty(self, row, x, y, w, h)
       elseif row.kind == "notice" then
         draw_notice(self, row, x, y, w, h)
+      elseif row.kind == "feature" then
+        self:_draw_feature(row, index, x, y, w, h)
       else
         self:_draw_entry(row, index, x, y, w, h)
       end

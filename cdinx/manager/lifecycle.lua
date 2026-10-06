@@ -288,7 +288,14 @@ function Lifecycle.clean(ctx, user_extensions_root, registry_root, dry_run)
 
   local orphaned = {}
   for name, plugin in pairs(on_disk) do
-    if have_index and not plugin.essential and not depended_on[name] then
+    -- `not plugin.essential` was always true, since no package may declare that
+    -- field any more, so this test never actually protected anything. What it was
+    -- reaching for is "something the build brought", which is `plugin._source ==
+    -- "builtin"` -- and the second term already covers it: a build package is in
+    -- the index, so it is not orphaned regardless. The explicit test is kept so
+    -- the reason is visible rather than inferred.
+    local from_build = plugin._source == "builtin"
+    if have_index and not from_build and not depended_on[name] then
       local still_in_registry = index[name] ~= nil
       if not still_in_registry then
         orphaned[#orphaned + 1] = name
@@ -333,8 +340,10 @@ end
 function Lifecycle.disable(ctx, name, save_state)
   local plugin = ctx.available[name]
   if not plugin then return false, "unknown extension: " .. name end
-  if plugin._source == "builtin" or plugin.essential then
-    return false, "essential extension cannot be disabled"
+  -- "part of the editor" rather than "essential": the field is gone and the
+  -- panel already words it that way, so the message and the test now agree.
+  if plugin._source == "builtin" then
+    return false, plugin.name .. " is part of the editor and cannot be disabled"
   end
   if plugin._source ~= "installed" then
     return false, "extension is not installed"
@@ -360,8 +369,8 @@ end
 function Lifecycle.uninstall(ctx, name, save_state)
   local plugin = ctx.available[name]
   if not plugin then return false, "unknown extension: " .. name end
-  if plugin._source == "builtin" or plugin.essential then
-    return false, "essential extension cannot be removed: " .. name
+  if plugin._source == "builtin" then
+    return false, plugin.name .. " is part of the editor and cannot be removed"
   end
   if plugin._source ~= "installed" then
     return false, "extension is not installed: " .. name

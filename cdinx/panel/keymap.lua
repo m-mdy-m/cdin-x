@@ -14,9 +14,15 @@ local BROWSING = {
   ["down"]     = "pluginmanager:select-next",
   ["k"]        = "pluginmanager:select-previous",
   ["up"]       = "pluginmanager:select-previous",
+  -- `f` is the feature switch, and it is a separate command rather than another
+  -- spelling of toggle-cursor so the two cannot drift: space has always meant
+  -- install/enable/disable for a package, and on a feature row it means the
+  -- feature's own switch. One command would have had to decide, from the row kind,
+  -- which of two unrelated operations a key press meant.
   ["space"]    = "pluginmanager:toggle-cursor",
   ["return"]   = "pluginmanager:activate-cursor",
   ["x"]        = "pluginmanager:toggle-cursor",
+  ["f"]        = "pluginmanager:toggle-feature",
   ["i"]        = "pluginmanager:install-cursor",
   ["u"]        = "pluginmanager:uninstall-cursor",
   ["d"]        = "pluginmanager:open-details",
