@@ -7,7 +7,7 @@
 -- appears in :help and in ex-command completion only when treeview is
 -- actually installed.
 local command  = require "core.input.command"
-local registry = require "X.core.vim.registry"
+local registry = require "vim.registry"
 
 local M = {}
 

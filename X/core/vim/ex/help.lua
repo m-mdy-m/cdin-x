@@ -1,6 +1,6 @@
 local core = require "core"
 local Doc  = require "core.doc"
-local registry = require "X.core.vim.registry"
+local registry = require "vim.registry"
 
 local M = {}
 

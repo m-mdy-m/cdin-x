@@ -8,7 +8,7 @@
 -- "m" works with no document open too, which is the whole point of
 -- binding it through the registry — vim mode offers plugin keys on the
 -- home screen, where there is nothing for its own keys to do.
-local registry = require "X.core.vim.registry"
+local registry = require "vim.registry"
 
 local M = {}
 

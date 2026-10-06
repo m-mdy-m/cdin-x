@@ -1,25 +1,19 @@
 -- Git status badges in the project file tree.
 --
--- The treeview plugin knows nothing about git: it exposes a generic
--- provider registry (badge + refresh, see X/core/treeview/api.lua) and this
--- integration fills it in. Nothing in X/core/treeview mentions git, and
--- nothing in X/core/git mentions treeview.
+-- The treeview package knows nothing about git: it exposes a generic provider
+-- registry (badge + refresh, see treeview/api.lua) and this fills it in. Nothing
+-- in treeview mentions git, and nothing else in git mentions treeview — which is
+-- exactly why this is a `with` entry rather than a package or a dependency.
 --
--- The manifest is inline, and everything is required inside init(), so the
--- extension catalog can dofile() this file to read the manifest without
--- starting git's status thread for a plugin that may never be installed.
-local M = {
-  name = "git-treeview",
-  version = "0.2.0",
-  description = "Git status badges and refresh integration for Treeview",
-  author = "cdin Team",
-  license = "MIT",
-  category = "integration",
-  type = "plugin",
-  dependencies = { "git", "treeview" },
-  min_cdin_version = "0.5.0",
-  tags = { "git", "treeview", "integration" },
-}
+-- `with` on `treeview`, declared by `git`. That single key is enough: the entry
+-- is only ever offered while `git` itself is loaded, so `git` being up is implied
+-- by the fact that we are running, and `treeview` is the only other party there
+-- is to wait for. Two packages, one name in the table — which is the general
+-- shape of the mechanism, not a special case of it.
+--
+-- Everything is required inside `enable`, so a user without treeview never builds
+-- any of it, and git's status thread does not start for them.
+local M = {}
 
 -- Single-letter git status -> badge glyph, and -> colour. Kept as data so
 -- the mapping is readable and the style fallbacks stay in one place.
@@ -48,11 +42,11 @@ local function badge_color(style, status)
   return FALLBACK[status] or style.accent
 end
 
-local loaded = false
+local enabled = false
 
-function M.init()
-  if loaded then return end
-  loaded = true
+function M.enable()
+  if enabled then return end
+  enabled = true
 
   local core     = require "core"
   local style    = require "core.style"
@@ -69,12 +63,12 @@ function M.init()
   core.add_thread(git.status.thread)
 end
 
-function M.unload()
-  if not loaded then return end
+function M.disable()
+  if not enabled then return end
+  enabled = false
   local treeview = require "treeview.api"
   treeview.remove_badge_provider(PROVIDER_ID)
   treeview.remove_refresh_provider(PROVIDER_ID)
-  loaded = false
 end
 
 return M

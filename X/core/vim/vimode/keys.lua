@@ -3,15 +3,15 @@
 -- This file owns only *vim's own* vocabulary: motions, the i/a/o entry points,
 -- operators (d, y, c, =, gu, gU, g~ and the two shifts), counts, the two-key
 -- sequences, and the modes. Every key that belongs to some other plugin is
--- looked up in the registry (X.core.vim.registry) after vim's own keys have
+-- looked up in the registry (vim.registry) after vim's own keys have
 -- declined it, which is why there is no `if k == "/"` or `if k == "m"` here:
 --
---   / n N *        -> vim-search        (registry.call_key)
---   m              -> vim-menu          (registry.call_key)
---   shift+m        -> vim-plugin-manager(registry.call_key)
---   tab            -> vim-window        (registry.call_key)
---   gt / gT        -> vim-tab           (registry.call_gmap)
---   ctrl+w {c}     -> vim-window        (registry.wmap_get)
+--   / n N *        -> with/search.lua        (registry.call_key)
+--   m              -> with/menus.lua          (registry.call_key)
+--   shift+m        -> with/plugin-manager.lua(registry.call_key)
+--   tab            -> with/window.lua        (registry.call_key)
+--   gt / gT        -> with/tab.lua           (registry.call_gmap)
+--   ctrl+w {c}     -> with/window.lua        (registry.wmap_get)
 --
 -- ── what was broken, and why ─────────────────────────────────────────────
 --
@@ -30,13 +30,13 @@ local core      = require "core"
 local config    = require "core.config"
 local command   = require "core.input.command"
 local keymap    = require "core.input.keymap"
-local registry  = require "X.core.vim.registry"
-local exline    = require "X.core.vim.ex.commandline"
-local mode      = require "X.core.vim.vimode.mode"
-local motions   = require "X.core.vim.vimode.motions"
-local objects   = require "X.core.vim.vimode.textobjects"
-local operators = require "X.core.vim.vimode.operators"
-local text      = require "X.core.vim.vimode.text"
+local registry  = require "vim.registry"
+local exline    = require "vim.ex.commandline"
+local mode      = require "vim.vimode.mode"
+local motions   = require "vim.vimode.motions"
+local objects   = require "vim.vimode.textobjects"
+local operators = require "vim.vimode.operators"
+local text      = require "vim.vimode.text"
 
 local M = {}
 
@@ -118,8 +118,8 @@ end
 --
 -- A shifted symbol goes by its character, so `*` arrives as `"*"` and not as
 -- `"shift+8"`; an uppercase letter keeps the `shift+` spelling, because that is
--- how an integration registers it — vim-search binds `["shift+n"]` for `N`. A
--- binding whose spelling never arrives cannot fire, which is why vim-search's
+-- how an integration registers it — with/search.lua binds `["shift+n"]` for `N`. A
+-- binding whose spelling never arrives cannot fire, which is why with/search.lua's
 -- `*`, registered as `"*"`, was dead until this table existed.
 local function token_for(k, shift)
   if not shift then return k end
@@ -735,7 +735,7 @@ local function handle_normal(view, k, tok, shift)
   --
   -- Within the capitals, the registry is asked first: `N` is both vim's "search
   -- backwards" (which vim core cannot have, because search is a plugin) and
-  -- vim-search's "previous find", and `M` is both vim's "middle of the screen"
+  -- with/search.lua's "previous find", and `M` is both vim's "middle of the screen"
   -- and a menu. Only shifted letters need this, and every other capital —
   -- G, I, A, O, V, S, D, C, Y, X, P, J, H, L, U — is unambiguously vim's.
   local capital = shift and char:match("^%u$") ~= nil

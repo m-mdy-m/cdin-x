@@ -3,7 +3,7 @@
 -- "M" was hardcoded in X/core/vim/vimode.lua. It belongs here: the
 -- extension manager is a separate capability, and vim core must not know
 -- that shift+m opens a plugin browser.
-local registry = require "X.core.vim.registry"
+local registry = require "vim.registry"
 
 local M = {}
 

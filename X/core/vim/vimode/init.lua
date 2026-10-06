@@ -22,9 +22,9 @@
 local core    = require "core"
 local config  = require "core.config"
 local keymap  = require "core.input.keymap"
-local keys    = require "X.core.vim.vimode.keys"
-local mode    = require "X.core.vim.vimode.mode"
-local status  = require "X.core.vim.vimode.status"
+local keys    = require "vim.vimode.keys"
+local mode    = require "vim.vimode.mode"
+local status  = require "vim.vimode.status"
 
 local M = {}
 

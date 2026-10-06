@@ -1,4 +1,4 @@
-﻿-- Vim's motions: a key, and where the cursor goes when you press it.
+-- Vim's motions: a key, and where the cursor goes when you press it.
 --
 -- This file used to be a table of key -> cdin command name. It is now a table
 -- of key -> *rule*, and that change is the whole fix.
@@ -32,7 +32,7 @@
 -- function of (document, line, column, count, context), which is what lets
 -- normal mode, a pending operator and `.` share one definition of where `w`
 -- goes instead of three that agree until one of them is changed.
-local text = require "X.core.vim.vimode.text"
+local text = require "vim.vimode.text"
 
 local M = {}
 

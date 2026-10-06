@@ -139,7 +139,7 @@ local function module_prefix(entry)
 end
 
 -- The plugin owning a required module: the longest matching prefix wins,
--- so X.core.vim.ex resolves to vim rather than to a shorter prefix.
+-- so vim.ex resolves to vim rather than to a shorter prefix.
 local function owner_of(module_name)
   local best_name, best_len
   for name, entry in pairs(known) do
@@ -248,11 +248,12 @@ end
 --                                  private.
 --   no cross-package require at all unless declared, same as above.
 --
--- A `with` entry is the one exemption, and it is a narrow one. A `with` file is
--- allowed to reach into the package its manifest named -- that is what it is for,
--- it exists to wire two packages together that cannot know about each other -- but
--- only that one, and only from the file the manifest named. Every other file in the
--- package is under the same rules as before, so the exemption cannot become a
+-- A `with` entry is the one exemption, and it is a narrow one. The files that
+-- belong to a `with` entry -- the entry itself and the directory named after it --
+-- are allowed to reach into the package that entry names. That is what a `with`
+-- entry is for: it exists to wire two packages together that cannot know about
+-- each other. Nothing else in the package may reach, and a `with` file may reach
+-- only the one package its own entry named, so the exemption cannot become a
 -- general permission to reach in.
 --
 -- The two forms live in one tree during the move, so this is checked only for
@@ -262,15 +263,38 @@ for name, entry in pairs(known) do
     local prefix = module_prefix(entry)
     local declared = {}
     for _, d in ipairs(entry.meta.dependencies or {}) do declared[d] = true end
-    -- rel -> the partner that file is allowed to reach into, if it is a with file
+    -- rel -> the partner that file (or that file's with-entry) may reach into
     local with_partner = {}
-    for partner, rel in pairs(entry.meta.with or {}) do
-      with_partner[(rel:gsub("\\", "/"))] = partner
+    for partner, value in pairs(entry.meta.with or {}) do
+      -- A partner may carry a list of paths: two seams can wait on one package.
+      local paths = type(value) == "table" and value or { value }
+      for _, rel in ipairs(paths) do
+        local norm = (tostring(rel):gsub("\\", "/"))
+        with_partner[norm] = partner
+        -- The entry's own payload, in a directory named after it. `with/git.lua`
+        -- owns `with/git/`, and those files are part of the same seam.
+        if norm:sub(-4) == ".lua" then
+          local dir = norm:gsub("%.lua$", "")
+          with_partner[dir .. "/"] = partner
+          with_partner[dir .. "/init.lua"] = partner
+        end
+      end
     end
     local files = entry.single_file and { entry.path } or files_under(entry.base)
     for _, f in ipairs(files) do
       local rel = relpath_of(entry, f)
-      local partner = rel and with_partner[rel] or nil
+      local partner = nil
+      if rel then
+        local norm = rel:gsub("\\", "/")
+        partner = with_partner[norm]
+        -- Longest directory prefix wins, so `with/git/commands.lua` resolves to
+        -- whichever entry owns `with/git/`.
+        if not partner then
+          for path, p in pairs(with_partner) do
+            if path:sub(-1) == "/" and norm:sub(1, #path) == path then partner = p break end
+          end
+        end
+      end
       for _, mod in ipairs(requires_of(f)) do
         local owner = owner_of(mod)
         if owner and owner ~= name then
@@ -285,7 +309,7 @@ for name, entry in pairs(known) do
             -- nothing: mod is the owner's root module
           elseif partner then
             errors[#errors+1] = string.format(
-              "%s is a with entry for %q but reaches %s, owned by %q — a with file may only reach the package it named: %s",
+              "%s belongs to the with %q entry but reaches %s, owned by %q — a with entry may only reach the package it named: %s",
               name, partner, mod, owner, f)
           else
             errors[#errors+1] = string.format(

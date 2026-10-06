@@ -2,7 +2,7 @@
 -- can be registered and unregistered as a unit, and so init.lua stays a
 -- plain capability module with no command names in it.
 local core   = require "core"
-local shell  = require "X.core.vim.shell"
+local shell  = require "vim.shell"
 local config = require "core.config"
 
 local M = {}

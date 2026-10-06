@@ -17,7 +17,7 @@ local M = {}
 local function run(recipe)
   return function()
     local git = require "git.api"
-    require("X.core.vim.shell").run_in_buffer(git.recipes[recipe])
+    require("vim.shell").run_in_buffer(git.recipes[recipe])
   end
 end
 

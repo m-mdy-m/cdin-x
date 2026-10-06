@@ -24,13 +24,13 @@ local function commit()
   local core = require "core"
   core.command_view:enter("Commit message", function(msg)
     if msg == "" then core.error("vim-git: empty commit message"); return end
-    require("X.core.vim.shell").run_in_buffer(
+    require("vim.shell").run_in_buffer(
       'git commit -m "' .. msg:gsub('"', '\\"') .. '"')
   end, function() return {} end)
 end
 
 function M.section()
-  local shell = require "X.core.vim.shell"
+  local shell = require "vim.shell"
   local git   = require "git.api"
 
   local entries = {}

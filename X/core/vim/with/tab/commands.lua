@@ -1,10 +1,10 @@
 -- Ex-commands for vim-tab: :tabnew, :tabclose, :tabnext and friends.
 --
--- Registered into X.core.vim.registry rather than written into ex.lua, so
+-- Registered into vim.registry rather than written into ex.lua, so
 -- vim core never has to know that "tabnew" is a thing. :tabnew and
 -- :tabedit take an optional path, so the spec sets arg_paths = true and
 -- the ex command line offers path completion for them.
-local registry = require "X.core.vim.registry"
+local registry = require "vim.registry"
 
 local M = {}
 
@@ -16,7 +16,7 @@ local function open_file(arg)
   -- core's own helper: opens the path, and does not create it unless
   -- asked. Reused instead of reimplemented so :tabnew and :e behave
   -- identically.
-  return require("X.core.vim.ex").open_file(arg, false)
+  return require("vim.ex").open_file(arg, false)
 end
 
 function M.register()

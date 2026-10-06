@@ -8,7 +8,7 @@
 local core   = require "core"
 local common = require "core.utils.common"
 local fs     = require "core.fs"
-local fsops  = require "X.core.vim.ex.fsops"
+local fsops  = require "vim.ex.fsops"
 
 local M = {}
 

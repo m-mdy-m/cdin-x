@@ -25,7 +25,7 @@ rules:
   lint: error
   tests_folder: warning
 
-  # ── DevOps ──────────────────────────────────────
+  # ── DevOps ─────────────────────────────────────
   dockerfile: warning
   dockerignore: info
   github_workflows: error
@@ -40,70 +40,74 @@ rules:
   plugin_test: warning
 
   # ── Structure ──────────────────────────────────
-  X_folder: error
-  core_folder: error
+  # `X_folder`, `core_folder` and `integration_folder` are deliberately absent.
+  # They asserted a layout this repository no longer has: a top-level `core/`,
+  # an `X/integration/`, and `X/themes/`. What replaced them is below, and the
+  # rules that matter are enforced by `make validate` rather than by a checker
+  # that only knows where a file is:
+  #
+  #   * a package's identity is `name` in its package.lua, never its path
+  #   * nothing is mandatory; a bundle decides what a build ships
+  #   * a seam between two packages is a `with` entry, not a third package
+  #
+  # See AGENTS.md and CODE_STYLE.md for those, and X/README.md for what is left
+  # under X/.
+  packages_folder: error
   scripts_folder: info
-  docs_folder: info
   examples_folder: info
   issue_templates: error
   pr_template: error
 
 custom:
   folders:
-    # Core system — plugin engine
-    - path: "core"
+    # The kernel. Everything under here is cdin-x itself: it reads the host
+    # through host.lua and knows nothing about any package.
+    - path: "cdinx"
       structure:
         init: {}
-        manager: {}
         config: {}
+        host: {}
         manifest: {}
+        schema: {}
         command: {}
-        session_bootstrap: {}
 
-    # Extension catalog — categories are open-ended.
+    # X/ — what has not moved into packages/ yet. It is `vim`, and it is the
+    # last entry.
     - path: "X"
+      structure:
+        core: {}
+        syntax: {}
+        optional: {}
+
+    # Packages, grouped by domain. The domain is for humans; identity is the
+    # package's own name.
+    - path: "packages"
+      structure: {}
+
+    # Bundles — what a build ships. `standard` is the default; `make bundle
+    # BUNDLE=minimal` builds the kernel alone.
+    - path: "bundles"
       structure: {}
 
     # Documentation
     - path: "docs"
       structure:
-        architecture: {}
-        api: {}
-        development: {}
-        guides: {}
+        building: {}
+        plugins: {}
         README: {}
-        getting-start: {}
-        INSTALLATION: {}
-        Introduction: {}
 
-    # Scripts
+    # Scripts — the dev tooling. Every target in the Makefile lands here.
     - path: "scripts"
       structure:
-        new-plugin: {}
-        plugin-list: {}
         validate: {}
+        check: {}
+        bundle: {}
+        plugin-list: {}
         generate-manifest: {}
+        generate-index: {}
         install: {}
+        new-plugin: {}
         README: {}
-
-    # Git hooks
-    - path: ".husky"
-      structure:
-        pre-commit: {}
-        commit-msg: {}
-        pre-push: {}
-
-    # GitHub templates & workflows
-    - path: ".github/ISSUE_TEMPLATE"
-      structure:
-        bug_report: {}
-        feature_request: {}
-        config: {}
-
-    - path: ".github/workflows"
-      structure:
-        build: {}
-        release: {}
 
   files:
     # Root project files
@@ -117,66 +121,84 @@ custom:
     - path: "/CODE_OF_CONDUCT.md"
     - path: "/CODEOWNERS"
     - path: "/SECURITY.md"
+    - path: "/AGENTS.md"
+    - path: "/CODE_STYLE.md"
+    - path: "/NOTICE"
     - path: "/.gitignore"
+    - path: "/.dockerignore"
     - path: "/.editorconfig"
-    - path: "/.gix/config"
+    - path: "/.luacheckrc"
+    - path: "/.luarc.json"
+    - path: "/stylua.toml"
     - path: "/.pre-commit-config.yaml"
 
-    # cdinx/ — the extension manager
+    # cdinx/ — the kernel
     - path: "/cdinx/init.lua"
     - path: "/cdinx/config.lua"
+    - path: "/cdinx/host.lua"
     - path: "/cdinx/manifest.lua"
+    - path: "/cdinx/schema.lua"
     - path: "/cdinx/command.lua"
-    - path: "/cdinx/panel.lua"
+    - path: "/cdinx/manager/loader.lua"
+    - path: "/cdinx/manager/runtime.lua"
+    - path: "/cdinx/manager/catalog.lua"
+    - path: "/cdinx/manager/features.lua"
+    - path: "/cdinx/manager/with.lua"
+    - path: "/cdinx/manager/deps.lua"
+    - path: "/cdinx/manager/fetch.lua"
+    - path: "/cdinx/manager/lifecycle.lua"
+    - path: "/cdinx/panel/init.lua"
+
+    # plugins/ — the kernel's entry point in a build, and the shim every bundle
+    # writes alongside the kernel itself.
     - path: "/plugins/cdin-x/init.lua"
 
-    # X/ — the bundle every cdin build carries by default
+    # bundles/ — what a build ships
+    - path: "/bundles/standard.lua"
+    - path: "/bundles/minimal.lua"
+    - path: "/bundles/empty.lua"
+
+    # X/ — the last entry, and the syntax definitions
+    - path: "/X/core/vim/package.lua"
     - path: "/X/core/vim/init.lua"
-
-    # X/ — Optional workflow plugins (command palette, file finders, modules)
-    - path: "/X/core/palette/init.lua"
-    - path: "/X/core/finder/init.lua"
-    - path: "/X/core/modules/init.lua"
-
-    # X/ — Generated catalog index
-    - path: "/X/manifest.lua"
-
-    # X/ — Syntax plugins (single-file)
     - path: "/X/syntax/lua.lua"
 
-    # X/ — Everything not named by a bundle
-    - path: "/X/optional/theme_switcher/init.lua"
+    # The generated catalog index. Written by `make manifest`; do not edit.
+    - path: "/X/manifest.lua"
 
-    # X/ — Themes
-    - path: "/X/themes/default/theme.lua"
+    # packages/ — one manifest each, which is what makes a package a package.
+    - path: "/packages/navigation/workspace/package.lua"
+    - path: "/packages/navigation/launcher/package.lua"
+    - path: "/packages/system/themes/package.lua"
+    - path: "/packages/vcs/git/package.lua"
 
     # Examples
-    - path: "/examples/README.md"
-    - path: "/examples/terraform/terraform.lua"
-    - path: "/examples/terraform/manifest.lua"
-    - path: "/examples/terraform/README.md"
-    - path: "/examples/lua/lua.lua"
-    - path: "/examples/lua/manifest.lua"
-    - path: "/examples/lua/README.md"
+    - path: "/examples/01-hello/init.lua"
+    - path: "/examples/02-word-count/init.lua"
+    - path: "/examples/03-vim-word-count/init.lua"
 
     # Documentation
     - path: "/docs/README.md"
-    - path: "/docs/architecture/README.md"
-    - path: "/docs/api/README.md"
-    - path: "/docs/development/README.md"
-    - path: "/docs/guides/README.md"
-    - path: "/docs/getting-start.md"
-    - path: "/docs/INSTALLATION.md"
-    - path: "/docs/Introduction.md"
+    - path: "/docs/getting-started.md"
+    - path: "/docs/writing-a-plugin.md"
+    - path: "/docs/extending-vim.md"
+    - path: "/docs/installing-plugins.md"
 
     # Scripts
-    - path: "/scripts/new-plugin.lua"
-    - path: "/scripts/plugin-list.lua"
     - path: "/scripts/validate.lua"
-    - path: "/scripts/generate-manifest.lua"
-    - path: "/scripts/install.py"
+    - path: "/scripts/check.lua"
     - path: "/scripts/bundle.py"
+    - path: "/scripts/install.py"
+    - path: "/scripts/plugin-list.lua"
+    - path: "/scripts/generate-manifest.lua"
+    - path: "/scripts/generate-index.lua"
+    - path: "/scripts/new-plugin.lua"
     - path: "/scripts/README.md"
+
+    # Git hooks
+    - path: "/.husky/pre-commit"
+    - path: "/.husky/commit-msg"
+    - path: "/.husky/pre-push"
 
     # GitHub templates & workflows
     - path: "/.github/PULL_REQUEST_TEMPLATE.md"
@@ -184,10 +206,9 @@ custom:
     - path: "/.github/ISSUE_TEMPLATE/bug_report.yml"
     - path: "/.github/ISSUE_TEMPLATE/feature_request.yml"
     - path: "/.github/ISSUE_TEMPLATE/config.yml"
-    - path: "/.github/workflows/build.yml"
+    - path: "/.github/workflows/ci.yml"
+    - path: "/.github/workflows/bundle.yml"
+    - path: "/.github/workflows/contract.yml"
     - path: "/.github/workflows/release.yml"
-
-    # Git hooks
-    - path: "/.husky/pre-commit"
-    - path: "/.husky/commit-msg"
-    - path: "/.husky/pre-push"
+    - path: "/.github/workflows/tag.yml"
+    - path: "/.github/workflows/test-install.yml"

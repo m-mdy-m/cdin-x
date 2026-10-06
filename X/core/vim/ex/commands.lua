@@ -15,9 +15,9 @@
 local core    = require "core"
 local command = require "core.input.command"
 local fs      = require "core.fs"
-local registry = require "X.core.vim.registry"
-local fsops   = require "X.core.vim.ex.fsops"
-local help    = require "X.core.vim.ex.help"
+local registry = require "vim.registry"
+local fsops   = require "vim.ex.fsops"
+local help    = require "vim.ex.help"
 
 local M = {}
 
@@ -163,7 +163,7 @@ function M.register()
 
     -- ── windows ──────────────────────────────────────────────────────
     -- :wincmd is core ex-mode syntax, but the character -> command table
-    -- is contributed by an integration (vim-window) via register_wmap,
+    -- is contributed by an integration (with/window.lua) via register_wmap,
     -- exactly as Ctrl+W does in normal mode.
     spec({ "wincmd", "winc" }, function(arg1)
       local char = arg1 or ""

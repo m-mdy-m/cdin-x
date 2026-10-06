@@ -3,8 +3,8 @@
 Git process discovery, running git, and reading repository status.
 
 It knows nothing about the file tree, vim menus, or any other UI. Those
-relationships are integrations: [`git-treeview`](../../integration/git-treeview)
-for badges in the tree, [`vim-git`](../../integration/vim/vim-git) for commands and
+relationships are integrations: [`the git package's treeview seam`](../../integration/the git package's treeview seam)
+for badges in the tree, [`with/git.lua`](../../integration/vim/with/git.lua) for commands and
 a menu section.
 
 The status bar reads the result through `core.register_vcs_provider`, so with

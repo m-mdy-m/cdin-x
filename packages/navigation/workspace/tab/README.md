@@ -3,7 +3,7 @@
 Tabs: creating them, switching between them, moving and closing them.
 
 `gt` / `gT` and `:tabnew` and friends live in
-[`vim-tab`](../../integration/vim/vim-tab), and session persistence across
+[`with/tab.lua`](../../integration/vim/with/tab.lua), and session persistence across
 restarts lives in [`tab-session`](../../integration/tab-session). This plugin is
 the capability; both of those are the wiring.
 

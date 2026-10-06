@@ -16,7 +16,7 @@
 -- the host already knows the indent string, the tab setting and what counts as
 -- a blank line, and a second implementation here would drift from it.
 local command = require "core.input.command"
-local text    = require "X.core.vim.vimode.text"
+local text    = require "vim.vimode.text"
 
 local M = {}
 

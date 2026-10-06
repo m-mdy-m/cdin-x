@@ -7,14 +7,14 @@
 --   * once a path-taking command is recognised and an argument has been
 --     started, complete filesystem paths.
 local common   = require "core.utils.common"
-local registry = require "X.core.vim.registry"
-local tokenize = require "X.core.vim.ex.tokenize"
+local registry = require "vim.registry"
+local tokenize = require "vim.ex.tokenize"
 
 local M = {}
 
 -- Commands whose argument is a path, so typing one offers path
 -- completion. Only core's own commands are listed; an integration that
--- takes a path (vim-tab's :tabnew, vim-window's :split) declares
+-- takes a path (with/tab.lua's :tabnew, with/window.lua's :split) declares
 -- `arg_paths = true` on its spec and is handled by the same branch.
 local PATH_COMMANDS = {
   e = true, edit = true, new = true,

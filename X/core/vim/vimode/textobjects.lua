@@ -18,8 +18,8 @@
 -- Like motions, every entry is a function of (document, line, column) and
 -- touches no view and no clipboard, so normal mode, an operator and `.` all
 -- agree about what `a"` means.
-local text    = require "X.core.vim.vimode.text"
-local motions = require "X.core.vim.vimode.motions"
+local text    = require "vim.vimode.text"
+local motions = require "vim.vimode.motions"
 
 local M = {}
 

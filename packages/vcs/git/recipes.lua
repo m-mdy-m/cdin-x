@@ -3,8 +3,8 @@
 -- These are command *strings*, not cdin commands: nothing registers them
 -- and nothing binds a key to them. They exist so integrations share one
 -- spelling of each invocation instead of each hardcoding its own — see
--- X/integration/vim/vim-git, which runs every one of these through
--- X.core.vim.shell.run_in_buffer().
+-- X/integration/vim/with/git.lua, which runs every one of these through
+-- vim.shell.run_in_buffer().
 --
 -- Named `recipes` rather than `commands` on purpose: in this codebase
 -- `commands.lua` means "a module with register()/unregister() that owns a

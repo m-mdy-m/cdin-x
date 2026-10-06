@@ -1,4 +1,4 @@
--- Normal-mode key bindings owned by vim-window.
+-- Normal-mode key bindings owned by with/window.lua.
 --
 -- Two kinds:
 --
@@ -12,7 +12,7 @@
 --   Tab         move to the next pane, which is what Tab does in every
 --                other editor. Declared through registry.register_key, so
 --                vim mode offers it only after declining its own keys.
-local registry = require "X.core.vim.registry"
+local registry = require "vim.registry"
 
 local M = {}
 

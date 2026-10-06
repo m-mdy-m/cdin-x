@@ -4,7 +4,7 @@
 -- These go into registry.register_gmap, so vim mode only knows that
 -- "g" + <key> is a two-key sequence it should resolve; it never learns
 -- that "t" means "switch tab". :tabnext and friends are in commands.lua.
-local registry = require "X.core.vim.registry"
+local registry = require "vim.registry"
 
 local M = {}
 

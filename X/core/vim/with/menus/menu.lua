@@ -3,17 +3,16 @@
 -- The menu is built on the generic menu capability (menu), which
 -- knows nothing about files, shells or vim. This module only supplies the
 -- context and the entry list; other integrations extend the same menu
--- through menu.extend (see vim-search, vim-treeview, vim-git).
+-- through menu.extend (see with/search.lua, with/treeview.lua, with/git.lua).
 local core  = require "core"
 local fs    = require "core.fs"
-local menu  = require "menu.impl"
-local files = require "X.integration.vim.vim-menu.files"
+local files = require "vim.with.menus.files"
 
 local M = {}
 
 M.NAME = "vim.main"
 
-local function shell() return require "X.core.vim.shell" end
+local function shell() return require "vim.shell" end
 
 -- What the menu is acting on: the current file's directory if a document
 -- is open, otherwise the working directory.
@@ -46,6 +45,9 @@ local function network_info()
   -- Command output, not a file the user edited. Without clean() the doc stays
   -- dirty and every :q after :net offers to discard "unsaved changes" to it.
   doc:clean()
+  -- `self` is unused because the name is a constant: the point of overriding it is
+  -- that every reader sees the same string, and taking it as an argument would
+  -- invite a caller to pass something else.
   function doc:get_name() return ":net" end
   core.root_view:open_doc(doc)
 end
@@ -57,18 +59,28 @@ local function entries(ctx)
 
   return {
     { header = "Files  [" .. label .. "]", entries = {
-      { key = "n", label = "New File",       info = "in " .. label,   action = function() files.new_file(dir) end },
-      { key = "N", label = "New Directory",  info = "mkdir",           action = function() files.new_dir(dir) end },
-      { key = "o", label = "Open File",      info = "browse & open",  action = function() files.open_file(dir) end },
-      { key = "r", label = "Rename",         info = label,            action = function() files.rename(file, dir) end },
-      { key = "y", label = "Copy",           info = label,            action = function() files.copy(file, dir) end },
-      { key = "v", label = "Move",           info = label,            action = function() files.move(file, dir) end },
-      { key = "x", label = "Delete",         info = label,            action = function() files.delete(file, dir) end },
+      { key = "n", label = "New File", info = "in " .. label,
+        action = function() files.new_file(dir) end },
+      { key = "N", label = "New Directory", info = "mkdir",
+        action = function() files.new_dir(dir) end },
+      { key = "o", label = "Open File", info = "browse & open",
+        action = function() files.open_file(dir) end },
+      { key = "r", label = "Rename", info = label,
+        action = function() files.rename(file, dir) end },
+      { key = "y", label = "Copy", info = label,
+        action = function() files.copy(file, dir) end },
+      { key = "v", label = "Move", info = label,
+        action = function() files.move(file, dir) end },
+      { key = "x", label = "Delete", info = label,
+        action = function() files.delete(file, dir) end },
     }},
     { header = "Navigate", entries = {
-      { key = "f", label = "Change Directory",   info = "cd",  action = function() M.change_dir_prompt(dir) end },
-      { key = "u", label = "Up One Level",       info = "cd ..", action = function() files.change_dir(files.dirname(dir)) end },
-      { key = ".", label = "Current Directory",  info = dir or ".", action = function() core.log(dir or fs.pwd()) end },
+      { key = "f", label = "Change Directory", info = "cd",
+        action = function() M.change_dir_prompt(dir) end },
+      { key = "u", label = "Up One Level", info = "cd ..",
+        action = function() files.change_dir(files.dirname(dir)) end },
+      { key = ".", label = "Current Directory", info = dir or ".",
+        action = function() core.log(dir or fs.pwd()) end },
       { key = "w", label = "Working Directory",  info = "pwd",  action = shell_buffer("pwd") },
     }},
     { header = "Build", entries = {
@@ -76,7 +88,8 @@ local function entries(ctx)
       { key = "t", label = "Run Tests", info = "make test", action = shell_buffer("make test") },
     }},
     { header = "Shell", entries = {
-      { key = "!", label = "Custom Command", info = "type any shell command", action = function() shell().prompt_and_run() end },
+      { key = "!", label = "Custom Command", info = "type any shell command",
+        action = function() shell().prompt_and_run() end },
       { key = "e", label = "Environment",     info = "env",  action = shell_buffer("env") },
       { key = "i", label = "Network Info",    info = "ip addr / ifconfig", action = network_info },
     }},
@@ -92,7 +105,12 @@ function M.change_dir_prompt(dir)
   if dir and dir ~= "." then core.command_view:set_text(dir) end
 end
 
-function M.register()
+-- The registry is passed in rather than required. im.main is defined from
+-- init, which already has to reach for the menu package under a pcall because
+-- the package is optional -- and a top-level require here would put that same
+-- optional dependency back into a file that has to be requireable without it.
+--- @param menu table  the menu.impl registry
+function M.register(menu)
   menu.define(M.NAME, { title = "Menu", context = context, entries = entries })
 end
 

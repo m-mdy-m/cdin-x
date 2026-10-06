@@ -2,7 +2,7 @@
 local core   = require "core"
 local config = require "core.config"
 local style  = require "core.style"
-local mode   = require "X.core.vim.vimode.mode"
+local mode   = require "vim.vimode.mode"
 
 local M = {}
 

@@ -31,7 +31,7 @@ local BROWSING = {
 }
 
 -- The stroke that opens the panel. Shift+M is vim's normal-mode key and is
--- bound by vim-plugin-manager through vim's own registry; it is NOT bound here,
+-- bound by with/plugin-manager.lua through vim's own registry; it is NOT bound here,
 -- because a global shift+m is also the keystroke for typing a capital M, and
 -- bound globally it opened the panel from insert mode and from the ":" prompt.
 -- ctrl+shift+M works everywhere, and is why the panel is reachable in a

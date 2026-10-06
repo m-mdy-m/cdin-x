@@ -35,6 +35,10 @@ local KINDS = { plugin = true, lang = true, theme = true, bundle = true, glue = 
 ---   number   a number
 ---   rangemap { <package name> = "<version range>" }
 ---   pathmap  { <key> = "<a file inside the package>" }
+---   withmap  { <package name> = "<a file>", or = { "<a file>", ... } }
+---             The key is always the *package* on the other side, never a name for
+---             the seam -- that is what lets validate check what it reaches. Two
+---             seams can wait on one package, hence the list form.
 ---   tables   { <key> = { ... } }
 ---   listmap  { <key> = { "<string>", ... } }
 ---   list     { "<string>", ... }
@@ -50,7 +54,7 @@ local FIELD_KINDS = {
   min_cdin_version = "string",
   max_cdin_version = "string",
   depends = "rangemap",
-  with = "pathmap",
+  with = "withmap",
   features = "tables",
   options = "tables",
   needs = "listmap",
@@ -198,6 +202,32 @@ local function is_range_map(value)
   return true
 end
 
+--- Whether a `with` table maps each partner to one path or to several.
+---
+--- Several, because two seams can legitimately wait on the same package: vim has
+--- one for the tab bindings and another for the window bindings, and both need
+--- `workspace`. A plain path map can only say one, so the second would be
+--- unreachable -- and keying by seam name instead would leave the partner
+--- unstated, which is the one thing worth checking. So the key stays the partner
+--- and the value is a path, or a list of them.
+--- @param value any
+--- @return boolean
+local function is_with_map(value)
+  for key, rel in pairs(value) do
+    if type(key) ~= "string" then return false end
+    if type(rel) == "string" then
+      if rel == "" then return false end
+    elseif type(rel) == "table" then
+      -- A list of paths, and a non-empty one: `workspace = { }` declares a seam
+      -- that does not exist, which is a typo rather than an intent.
+      if not is_list_of_strings(rel) or #rel == 0 then return false end
+    else
+      return false
+    end
+  end
+  return true
+end
+
 local function is_path_map(value)
   for key, rel in pairs(value) do
     if type(key) ~= "string" or type(rel) ~= "string" then return false end
@@ -223,6 +253,10 @@ local function wrong_kind(kind, value)
   elseif kind == "pathmap" then
     if type(value) ~= "table" or not is_path_map(value) then
       return "a key mapped to a file inside the package"
+    end
+  elseif kind == "withmap" then
+    if type(value) ~= "table" or not is_with_map(value) then
+      return "a package name mapped to a file inside the package, or a list of them"
     end
   elseif kind == "tables" then
     if type(value) ~= "table" then return "a table" end

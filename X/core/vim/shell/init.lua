@@ -3,7 +3,7 @@
 -- This is the only part of vim mode that is not really about editing:
 -- ":!cmd" needs somewhere to run a command and somewhere to put the
 -- output. Integrations reuse it rather than each writing their own
--- io.popen wrapper (vim-git runs every git command through here).
+-- io.popen wrapper (with/git.lua runs every git command through here).
 --
 -- Layout of this directory:
 --   init.lua     capture / run / run_in_buffer / platform

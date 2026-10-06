@@ -43,11 +43,11 @@ local KEYS = {
 }
 
 function M.register()
-  require("X.core.vim.registry").register_key(KEYS)
+  require("vim.registry").register_key(KEYS)
 end
 
 function M.unregister()
-  require("X.core.vim.registry").unregister_key(KEYS)
+  require("vim.registry").unregister_key(KEYS)
 end
 
 return M

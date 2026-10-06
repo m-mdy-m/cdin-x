@@ -20,19 +20,19 @@
 --   suggest.lua   command-name and path completion
 --   help.lua      :help rendering
 --   fsops.lua     open_file / save_all / show_ls / doc repointing
-local registry  = require "X.core.vim.registry"
-local tokenize  = require "X.core.vim.ex.tokenize"
-local history   = require "X.core.vim.ex.history"
-local commands  = require "X.core.vim.ex.commands"
-local suggest   = require "X.core.vim.ex.suggest"
-local shell     = require "X.core.vim.shell"
+local registry  = require "vim.registry"
+local tokenize  = require "vim.ex.tokenize"
+local history   = require "vim.ex.history"
+local commands  = require "vim.ex.commands"
+local suggest   = require "vim.ex.suggest"
+local shell     = require "vim.shell"
 
 local M = {}
 
 -- Shared so integrations that take a path argument (:tabnew <path>,
 -- :split <path>) reuse core's create-if-missing behaviour instead of
 -- re-implementing it. See ex/fsops.lua.
-M.open_file  = require("X.core.vim.ex.fsops").open_file
+M.open_file  = require("vim.ex.fsops").open_file
 M.history    = history.history
 
 -- Forget where we were in the history, so the next Ctrl+Up starts at the

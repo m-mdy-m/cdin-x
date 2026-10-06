@@ -1,5 +1,5 @@
--- Backwards-compatible alias for X.core.vim.registry.
-local registry = require "X.core.vim.registry"
+-- Backwards-compatible alias for vim.registry.
+local registry = require "vim.registry"
 
 local M = {}
 

@@ -83,7 +83,7 @@ function M.cd(path)
     return false
   end
   require("core.project").request_rescan(core)
-  require("X.core.vim.registry").emit("cwd_changed", fs.pwd())
+  require("vim.registry").emit("cwd_changed", fs.pwd())
   return true
 end
 

@@ -29,19 +29,35 @@ local With = {}
 --- @field other string   the package this entry wires itself to
 --- @field path string    where the file is, relative to the package
 
---- The `with` entries a package declares, sorted by partner name.
+--- The `with` entries a package declares, sorted by partner then by path.
 ---
---- Sorted so the order is the same on every run and in every log: two entries that
---- both wanted the same table would otherwise be raised in whatever order `pairs`
---- produced, which is not reproducible.
+--- A partner may carry a list of paths, because two seams can wait on the same
+--- package: vim has one for the tab bindings and one for the window bindings, and
+--- both need `workspace`. Flattening here is what lets every later step work on
+--- one entry per seam rather than on the manifest's shape.
+---
+--- Sorted so the order is the same on every run and in every log. The path is the
+--- tiebreak because a partner may carry more than one seam, and `pairs` order
+--- between them is not reproducible. They do not depend on each other, so either
+--- order is correct; what matters is that it is the *same* order every time, or a
+--- bug in one of them reproduces once a week.
 --- @param spec PackageSpec
 --- @return WithSpec[]
 function With.declared(spec)
   local out = {}
   for other, rel in pairs(spec.with or {}) do
-    out[#out + 1] = { other = other, path = rel }
+    if type(rel) == "table" then
+      for _, one in ipairs(rel) do
+        out[#out + 1] = { other = other, path = one }
+      end
+    else
+      out[#out + 1] = { other = other, path = rel }
+    end
   end
-  table.sort(out, function(a, b) return a.other < b.other end)
+  table.sort(out, function(a, b)
+    if a.other ~= b.other then return a.other < b.other end
+    return a.path < b.path
+  end)
   return out
 end
 

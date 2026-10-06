@@ -1,92 +1,82 @@
 # X/core
 
-What has not moved into `packages/` yet. The move is one directory at a time and
-it is nearly done: a package lives under `packages/<domain>/<name>` once it has a
-`package.lua`, and stays here until then. Both roots are scanned, so a package is
-found wherever it is and a tree can be half-moved.
+`vim`, and nothing else. Every other first-party package has moved to
+`packages/<domain>/<name>`, where a `package.lua` makes its identity its name and
+its modules required as `require "vim.registry"` rather than by where it sits.
 
-**One entry is left:**
+**The move is finished.** `X/integration/` is gone too — it held eight packages
+whose only content was wiring between two other packages, and those are now `with`
+entries: files inside one of the two, run only while both are loaded.
 
-| entry | what it is |
-| --- | --- |
-| `vim` | vim mode — the largest package. Phase 5 merges the seven `vim-*` integrations into it as `with/` files, and they leave `../integration/` |
+## vim
 
-`manager` was here too, and `bundles/standard.lua` used to name it. What it
-bootstrapped is `cdinx/`, and every bundle writes the kernel and its shim into the
-build whether or not a bundle lists anything — so the panel is reachable without a
-package being responsible for it. See `../../plugins/cdin-x/init.lua`.
+Vim mode, the ex command line, the shell escape, the modal editor, and seven
+seams to other packages.
 
-## Dependencies
+```text
+vim/
+  package.lua    the manifest: five partners, seven `with` entries
+  init.lua       the one load point, and the definition of `vim.main`
+  registry.lua   the extension points the seams register into
+  commands.lua   vim's own cdin commands
+  keymap.lua     vim's own non-modal key bindings
+  ex/            the ":" command line, split by concern
+  shell/         running shell commands and showing their output
+  vimode/        modal editing: key reader, motions, text objects, operators, mode
+  with/
+    git.lua             + git/            needs git
+    menus.lua           + menus/          needs menu
+    plugin-manager.lua  + plugin-manager/ needs menu
+    search.lua          + search/         needs search
+    tab.lua             + tab/            needs workspace
+    treeview.lua        + treeview/       needs treeview
+    window.lua          + window/         needs workspace
+```
 
-A plugin here may not depend on another plugin without declaring it, and must use a
-dependency through its root module only — its submodules are private. If two of
-these genuinely need each other, the wiring belongs in `../integration/`, which
-declares the dependency so the manager can order the load.
+Each `with/<name>.lua` is one seam: an `enable()` and a `disable()`, and a
+directory beside it holding the modules that seam owns. It runs only while both
+packages are loaded, and comes down when either leaves — so vim works with none of
+them installed, and so does each of them without vim.
 
-That rule is about *packages*. Inside a package it does not apply: `workspace` has
-four features and `window/keymap.lua` requires `window/commands.lua` freely,
-because a feature's siblings are not a dependency, they are the same thing. The
-line the rule draws is between two things a user can install separately.
+**The key in `with` is the package, never the seam.** That is what lets `validate`
+check what a seam is allowed to reach: a seam may reach the one package its own
+key names, and nothing else. Two seams waiting on one package is a list under
+that one key — which is why `menu` and `workspace` each carry two paths.
 
-The alternative is a plugin that works right up until somebody uninstalls the other
-one, and a catalog nobody can reason about. `make validate` fails the build rather
-than letting that happen.
+**`vim.main` is defined in `init.lua`, not in `with/menus.lua`.** Four seams call
+`menu.extend` or `menu.set_context_provider`, and both *assert* the menu exists. If
+the definition lived in an optional seam, whether an extender worked would depend
+on two optional things happening to load in the right order. Init always runs
+first, so the menu is always there.
+
+That is also why `with/menus/menu.lua` takes the menu registry as an argument
+rather than requiring it: init already has to reach for it under a `pcall`,
+because the `menu` package is optional, and a top-level `require` there would put
+that dependency back into a file that has to be loadable without it.
 
 ## Nothing here is mandatory
 
-There is no `essential` field and nothing that replaces it. What a build carries is
-decided by a bundle in `../../bundles/`, and a build can ship none of this:
-`make bundle BUNDLE=minimal` produces the kernel, its shim and the fonts, and
-nothing else.
+There is no `essential` field and nothing replaces it. What a build carries is
+decided by a bundle in `../../bundles/`. `make bundle BUNDLE=minimal` produces the
+kernel, its shim and the fonts, and nothing else.
 
-## Already in `packages/`
+`bundles/standard.lua` names `vim` and `themes`, so a standard build has vim mode
+with none of its seven seams — no git, no treeview, no workspace, no menu. That
+is the intended shape: vim is one package with seven optional parts, not seven
+packages that happen to need vim.
 
-| was | is now | where |
-| --- | --- | --- |
-| `git` | `git` | `packages/vcs/git` |
-| `treeview` | `treeview` | `packages/navigation/treeview` |
-| `menu` | `menu` | `packages/navigation/menu` |
-| `search` | `search` | `packages/navigation/search` |
-| `autocomplete` | **`complete`** | `packages/editing/complete` |
-| `autoupdate` | **`update`** | `packages/system/update` |
-| `autoreload` + `trimwhitespace` | **`basics`** | `packages/editing/basics`, two features |
-| `rtl_toggle` + `unicode_inspect` | **`text-tools`** | `packages/system/text-tools`, two features |
-| `theme_switcher` + the ten themes | **`themes`** | `packages/system/themes`, one feature and ten theme files |
-| `palette` + `finder` + `modules` | **`launcher`** | `packages/navigation/launcher`, three features |
-| `tab` + `window` + `session` + `tab-session` | **`workspace`** | `packages/navigation/workspace`, four features |
+## The config keys are the host's
 
-Each of these carries a `package.lua`, so its identity is its name and its modules
-are required as `require "git.api"` rather than by where it sits.
+`config.vim_mode_enabled` is written at the top level, not namespaced, because the
+**host** reads it. `config.vim.vim_mode_enabled` would be a key nothing reads, and
+vim mode would be silently off with no obvious cause — every gate tests
+`if not config.vim_mode_enabled then return false end`.
 
-`autocomplete` and `autoupdate` were **renamed**, not just moved. Their command names
-and their config keys were not: `autocomplete:complete`, `autocomplete:next` and
-`autoupdate:check` are still spelled the old way, because a user's `init.lua` and a
-keymap both name them. The same holds for `palette`, `finder`, `modules`, `tab`,
-`window` and `session`: the package names moved, and not one command name or
-keystroke did.
+## Commands and keys did not change
 
-`basics`, `text-tools`, `themes`, `launcher` and `workspace` are built from
-features: each member is a `features/<key>.lua` with an `enable()` and a
-`disable()`, and each can be switched off on its own.
-
-Two of these are not just co-located, they were *related* and are now one thing.
-
-- `themes` absorbed `session/theme-switcher`, which existed only to push the
-  switcher's choice into the session's saved theme. That is `themes`' own business
-  now, declared as its `with/themes.lua` entry rather than as a dependency
-  between two packages that must both be installed for either to work.
-- `workspace` absorbed `tab-session`, an *integration* that needed both the tab
-  manager and the session's quit hook. As features that ordering is just the order
-  they are enabled in — `session` before `tab-session`, because `tab-session`
-  subscribes to `session.on_quit()`. The dependency it used to declare became a
-  position in a list, which is the whole reason the merge was worth doing.
-
-`themes` is the awkward one. The host's theme root is `EXEDIR/data/themes`, that
-path is in cdin's extension contract, and there is no way to ask the host to look
-anywhere else — so the ten themes have to arrive at `<data>/themes/<name>/` in a
-build. `scripts/bundle.py` flattens them there *and* leaves the package's own copy
-in place, because a site install needs the second: the package registers its own
-root with `themes.add_root`, and only the host is allowed to do that in a build.
-Neither copy is generated or symlinked; both are the same files.
+`vim-git:status`, `vim-menu:open`, `vim-fmenu:open`, `vim-shell:git-log` and every
+keystroke are exactly as they were. Only the package and directory names moved:
+`X.core.vim.registry` is now `vim.registry`, and `X/integration/vim/vim-git/` is
+now `X/core/vim/with/git/`.
 
 Details: [docs/writing-a-plugin.md](../../docs/writing-a-plugin.md).

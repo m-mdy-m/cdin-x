@@ -1,7 +1,7 @@
 -- Vim mode's own cdin commands.
 local core     = require "core"
 local config   = require "core.config"
-local exline   = require "X.core.vim.ex.commandline"
+local exline   = require "vim.ex.commandline"
 
 local M = {}
 
@@ -31,7 +31,7 @@ local MAP = {
     else
       core.log("vim: normal mode off")
       -- drop any half-typed sequence so it cannot fire after re-enabling
-      pcall(function() require("X.core.vim.vimode.keys").reset() end)
+      pcall(function() require("vim.vimode.keys").reset() end)
     end
     core.redraw = true
   end,

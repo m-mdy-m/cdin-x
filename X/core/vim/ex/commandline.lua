@@ -3,7 +3,7 @@
 -- Lives beside ex/ rather than in vimode/ because it is ex's concern —
 -- vimode only decides *when* a key should reach it.
 local core = require "core"
-local ex   = require "X.core.vim.ex"
+local ex   = require "vim.ex"
 
 local M = {}
 

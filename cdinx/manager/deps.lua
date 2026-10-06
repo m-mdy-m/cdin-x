@@ -30,7 +30,7 @@ end
 -- and so does everything that depends on it. One extension with unmet
 -- dependencies must not take the manager -- and with it every other
 -- extension -- down. That is exactly what used to happen: installing
--- vim-git by itself made `topological_order` return nil for the WHOLE set,
+-- with/git.lua by itself made `topological_order` return nil for the WHOLE set,
 -- bootstrap failed, and nothing at all was loaded.
 --
 -- `optional_dependencies` only influence ordering: if an optional dependency
@@ -67,7 +67,7 @@ function Deps.topological_order(ctx, names)
     visiting[name] = true
 
     -- Collect every problem instead of stopping at the first, so the user
-    -- sees "needs git, menu, vim-menu" once, not three restarts' worth.
+    -- sees "needs git, menu, with/menus.lua" once, not three restarts' worth.
     local missing, blocked = {}, {}
     for _, dep in ipairs(plugin.dependencies or {}) do
       if not is_usable(ctx, dep) then

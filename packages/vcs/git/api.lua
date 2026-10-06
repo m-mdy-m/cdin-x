@@ -31,7 +31,7 @@ M.status   = status
 
 -- shell command strings. Named `recipes` rather than `commands` because
 -- they are not cdin commands: nothing registers them, they are just text
--- to hand to X.core.vim.shell.run_in_buffer().
+-- to hand to vim.shell.run_in_buffer().
 M.recipes  = recipes
 
 -- ── core integration point ──────────────────────────────────────────────

@@ -1,10 +1,10 @@
 -- Ex-commands for vim-window: :split, :vsplit, :vnew, :close, :only.
 --
--- Registered into X.core.vim.registry so vim core never hardcodes the
+-- Registered into vim.registry so vim core never hardcodes the
 -- window command vocabulary. :split / :vsplit / :vnew take an optional
 -- path, hence arg_paths = true.
 local command  = require "core.input.command"
-local registry = require "X.core.vim.registry"
+local registry = require "vim.registry"
 
 local M = {}
 
@@ -24,7 +24,7 @@ local function run_split(which, arg1)
   if arg1 then
     -- :vnew implies :new, so a missing file is created; :split / :vsplit
     -- behave like :e and refuse.
-    require("X.core.vim.ex").open_file(arg1, spec.create)
+    require("vim.ex").open_file(arg1, spec.create)
   end
 end
 
