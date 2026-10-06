@@ -9,7 +9,7 @@
 --
 -- The treeview knows nothing about git or any other capability: it exposes a
 -- generic badge/refresh provider registry (api.lua) that integrations fill in —
--- see X/integration/the git package's treeview seam.
+-- see the git package's `with/treeview.lua` seam.
 --
 -- The manifest is package.lua, which the catalog reads without running anything
 -- here, so the requires below may sit at the top whenever the order suits.

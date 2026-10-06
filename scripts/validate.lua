@@ -227,7 +227,7 @@ for name, entry in pairs(known) do
               "%s requires %s (owned by %q) without declaring it: %s", name, mod, owner, f)
           elseif namespace_of(entry) ~= "integration" then
             errors[#errors+1] = string.format(
-              "%s is in %s/ and requires %s — cross-plugin wiring belongs in X/integration/: %s",
+              "%s is in %s/ and requires %s — cross-package wiring belongs in a `with` entry: %s",
               name, namespace_of(entry), mod, f)
           end
         end

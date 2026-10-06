@@ -34,13 +34,20 @@ it, so order matters if you have several.
 
 ## To add it to the catalog
 
-Copy `X/syntax/lua.lua`, change the name, the description, the `files` pattern
-and the patterns. Then:
-
 ```sh
+lua scripts/new-plugin.lua zig syntax
 make manifest
 make validate
 ```
+
+That writes `X/syntax/zig.lua` from a template whose shape is copied from
+`X/syntax/lua.lua`, and it refuses to write anything if the file already exists.
+The refusal is the point: `new-plugin.lua lua syntax` in this repository would
+otherwise overwrite the real `X/syntax/lua.lua` without asking.
+
+Six ship here: `c`, `javascript`, `lua`, `markdown`, `python`, `typescript` —
+and they claim disjoint extensions, so a `.ts` file is never picked up by the
+JavaScript definition. See the table below.
 
 ## The shape
 
@@ -49,10 +56,12 @@ return {
   name = "zig",
   version = "0.1.0",
   description = "Zig syntax support",
+  author = "cdin Team",
+  license = "MIT",
   category = "syntax",
   type = "plugin",
-  essential = false,
-  dependencies = {},
+  dependencies = {  },
+  min_cdin_version = "0.5.0",
   tags = { "language", "zig" },
 
   init = function(core, config)
@@ -80,6 +89,15 @@ return {
   unload = function() end,
 }
 ```
+
+**The manifest fields are at the top level and `init` does the work.** That is
+the single-file shape, and it is the only thing here that looks like the old
+style: a syntax definition has no directory, so there is no `package.lua` to put
+the manifest in, and it is the one place that keeps doing it the old way.
+
+**`unload` is empty on purpose.** The highlighter has no remove, so there is
+nothing to undo. An empty function is a true statement about that; a missing one
+is a hole the reader has to reason about.
 
 ### `files` and `headers`
 

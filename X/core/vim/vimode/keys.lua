@@ -767,7 +767,7 @@ local function handle_normal(view, k, tok, shift)
   end
 
   if shift then
-    -- Also the route by which `*` reaches vim-search: the host sends it as the
+    -- Also the route by which `*` reaches the `with` entry on `search`: the host sends it as the
     -- 8 key with shift held, and this is where it becomes the character.
     if registry.call_key(tok, view) then return true end
     return handle_shifted(view, char, count)

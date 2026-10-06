@@ -1,4 +1,4 @@
--- Normal-mode key bindings for vim-search: the / n N * family.
+-- Normal-mode key bindings for the `with` entry on `search`: the / n N * family.
 --
 -- These four used to be hardcoded in X/core/vim/vimode.lua as
 -- `if k == "/" then vimapi.call("search", "find")`. They belong here: "/"

@@ -4,8 +4,9 @@ Running git, and knowing what state the repository is in.
 
 Install it and the status bar grows a branch. That is most of what this plugin
 does on its own — **it registers no commands and binds no keys**, on purpose.
-Anything you would want to *do* with git belongs in an integration, and
-[`vim-git`](../../X/integration/vim/vim-git) is the one that ships.
+Anything you would want to *do* with git belongs to another package, and vim's
+`with` entry on `git` is the one that ships. See
+[what vim is wired to](vim-integrations.md).
 
 ## What you get on its own
 
@@ -38,7 +39,7 @@ decode the escapes inside it.
 
 ## Using it from a menu
 
-With `vim-git` installed, <kbd>m</kbd> → Git, or the commands:
+With `vim` and `menu` installed, <kbd>m</kbd> has a Git section, or run the commands:
 
 | command | runs |
 | --- | --- |
@@ -136,8 +137,8 @@ They are named `recipes` and not `commands` on purpose. In this codebase
 of *cdin commands*, and a table of strings would be a lie under that name.
 
 Adding to it is a one-line change, and every menu entry and command that runs
-that git invocation follows — which is why `vim-git`'s menu and its command
-list cannot drift apart.
+that git invocation follows — which is why the `with` entry on `git` has both its menu and its command
+list driven by the one table.
 
 ## How it works
 
@@ -164,8 +165,8 @@ flag so a later enable registers again. That is a smaller promise than the rest
 of the catalog makes, and it is honest about it.
 
 **This plugin starts no polling thread.** `core.add_thread(git.status.thread)`
-appears in exactly one place in the catalog, and it is
-[`git-treeview`](../../X/integration/git-treeview) — not here. So installing
+appears in exactly one place in the catalog, and it is not here — it belonged to
+`git-treeview`, and that package is gone. So installing
 `git` on its own registers a provider and leaves `git.status.branch` nil until
 the host's `register_vcs_provider` hook decides to start the loop for it. That
 is the host's half of the contract, and the page should not have implied

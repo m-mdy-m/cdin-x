@@ -1,4 +1,4 @@
--- Ex-commands for vim-window: :split, :vsplit, :vnew, :close, :only.
+-- Ex-commands for the `with` entry on `workspace`: :split, :vsplit, :vnew, :close, :only.
 --
 -- Registered into vim.registry so vim core never hardcodes the
 -- window command vocabulary. :split / :vsplit / :vnew take an optional

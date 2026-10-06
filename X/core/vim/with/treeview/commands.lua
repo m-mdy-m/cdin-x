@@ -1,4 +1,4 @@
--- Ex-commands for vim-treeview: :tree focuses (and refreshes) the project
+-- Ex-commands for the `with` entry on `treeview`: :tree focuses (and refreshes) the project
 -- file tree.
 --
 -- :tree used to be hardcoded in X/core/vim/ex.lua, which meant vim mode

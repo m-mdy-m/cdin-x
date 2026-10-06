@@ -2,10 +2,13 @@
 
 Modal editing, and the `:` ex command line.
 
-One of two plugins marked `essential = true` (the other is `manager`): a cdin build copies it in, because an
-editor with no other modal editing isn't an editor. Which is also why it's
-**self-contained** — it is bundled alone, so every `require "X.…"` inside it
-resolves within its own subtree, and `make validate` checks that.
+One of the two packages every bundle ships (the other is `manager`): a cdin build
+copies it in, because an editor with no other modal editing isn't an editor.
+
+It is **not** required to be self-contained. That rule existed only because an
+essential package was copied *alone*, so every `require` inside it had to resolve
+within its own subtree. A bundle is a *closure* now, and `manager` ships beside
+this without declaring anything about it.
 
 Vim mode knows nothing about tabs, trees, search or git. It offers seams
 instead, and [`../../integration/vim/`](../../integration/vim) is where those get

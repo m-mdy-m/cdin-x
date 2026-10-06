@@ -1,17 +1,19 @@
 # optional
 
-Plugins that aren't a capability anyone depends on, and that nobody is
-waiting for. Installed by the user, from the manager, like any other plugin.
+**Empty.** Kept as a home for a genuinely standalone package, and nothing is in
+it.
 
-| directory | does |
+It used to hold `rtl_toggle`, `theme_switcher` and `unicode_inspect`. All three
+are now features of two packages, which is where they belong:
+
+| was | is now |
 | --- | --- |
-| `rtl_toggle/` | switch text direction and Arabic shaping at runtime |
-| `theme_switcher/` | pick a theme — `session-theme-switcher` is what remembers it |
-| `unicode_inspect/` | show the code points around the caret |
+| `rtl_toggle`, `unicode_inspect` | features `rtl` and `unicode` of [`text-tools`](../../packages/system/text-tools) |
+| `theme_switcher` | the `switcher` feature of [`themes`](../../packages/system/themes) |
 
-Same rule as [`../core/`](../core): a plugin here may not depend on another X
-plugin. Being optional is about whether people want it, not about what it is
-allowed to know.
-
-None of these are `essential`. Only `vim`, `manager` and the `default` theme are, and
-neither lives here.
+Same rule as [`../core/`](../core), and it is the rule for every directory here: a
+package may not depend on another package. Being here would have been about
+whether people want it, not about what it is allowed to know \u{2014} which is
+exactly why it was the wrong axis. **What a build carries** is `bundles/*.lua`
+and nothing else; there is no per-package flag, and `make validate` rejects one
+by name.

@@ -30,16 +30,20 @@ make manifest
 make validate
 ```
 
-That writes `X/themes/my-theme/theme.lua` from a template. Change
-`essential = false` — which is what the template already says, and what it
-should stay, unless you are genuinely replacing the default.
+That writes `packages/system/themes/themes/my-theme/theme.lua` and a README, and
+it copies the template from `nord/theme.lua` rather than inventing one. That
+matters more than it looks: **the key names are the host's, and a wrong one is
+invisible.** The runtime falls back to the default for a key nobody supplied, so
+a misspelled colour key is a theme that quietly looks like another one rather
+than an error.
 
 Ten ship here: `catppuccin-mocha`, `default`, `dracula`, `github-light`,
 `gruvbox-dark`, `monokai`, `nord`, `solarized-dark`, `solarized-light`,
 `tokyo-night`.
 
-`default` is the only one marked `essential = true`, because a build bundles
-exactly one theme and has to be able to start with it. Yours will not be.
+**Nothing in a theme file says whether it ships.** A theme reaches a build only
+when a bundle in `bundles/` names it, and `standard` names `themes` — the
+*container*, not the themes inside it. See [X/README.md](../../X/README.md).
 
 ## Every key
 
@@ -154,12 +158,16 @@ Two things about that shape.
 would change the original, and the original is on disk and shared. Walking the
 nested `syntax` table by hand is the price of not doing that.
 
-**`essential` is inherited from the base.** `nord` is not essential, so this is
-not either — but if you copy from `default`, you *will* inherit
-`essential = true`, and the bundler will then bundle your theme and refuse to
-have two. Set it to `false` explicitly. It is the one field where copying is a
-trap, and the failure shows up as a confusing error from `bundle.py` rather than
-anything to do with themes.
+**A copied theme is a new theme, and it is not in any build.** There is no
+`essential` field to set and no inherited flag to override. The only question was
+ever "is this in a build", and it is answered by `bundles/standard.lua` naming
+the `themes` package — never by anything in a theme file. A theme you add is
+available to the switcher and to `core.themes.add_root()`, and that is all.
+
+**Every key in the base is a key you now own.** Copy `nord` and you have copied
+`["function"]` and all of the `vim_*` pills, and if `nord` later gains one your
+copy will not. Deep-copying a theme is copying a snapshot; the thing to copy
+instead is the *list* in this page.
 
 ## How it works
 
@@ -182,15 +190,20 @@ does not add a running plugin — it adds an entry to the theme switcher, and
 nothing appears to happen until you select it. That is a confusing first
 experience and it is worth knowing about before you conclude the install failed.
 
-**`theme_switcher` sets the theme; `session-theme-switcher` remembers it.**
-Two plugins, because "change it now" and "remember that I did" are separate
-questions and some people want the first without the second. See
-[optional](../plugins/optional.md).
+**The switcher sets the theme; a `with` entry is what remembers it.** They are
+two different questions — *change it now* and *remember that I did* — and some
+people want the first without the second. The switcher is the `switcher` feature
+of the [`themes`](../plugins/themes.md) package; the remembering is
+`with/themes.lua`, which exists only while both `themes` and `workspace` (through
+its `session` feature) are active.
 
+`config.theme = "nord"` in your own `init.lua` does neither of those, and does
+not need either: the host reads it at startup. That is the answer for someone who
+does not want a list.
 ## Files
 
 | file | holds |
 | --- | --- |
-| `theme.lua` | the colours, and the manifest fields |
-| `../../scripts/generate-manifest.lua` | what puts it in the catalog |
-| `../../scripts/new-plugin.lua` | the template |
+| `theme.lua` | the colours, and nothing else |
+| `../../scripts/new-plugin.lua` | the template, copied from `nord` |
+| `../../scripts/generate-manifest.lua` | what puts it in the catalog index |

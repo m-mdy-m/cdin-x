@@ -9,7 +9,7 @@ Install it and the parts of the editor that show you a list start working.
 
 ## Using a menu
 
-<kbd>m</kbd> in vim mode, if `vim-menu` is installed. Or `menu.open("…")` from
+<kbd>m</kbd> in vim mode, with `vim` installed. Or `menu.open("…")` from
 your own code.
 
 It is the command palette's prompt, with sections. That means the same keys:
@@ -38,12 +38,12 @@ character that some entry claims, the list collapses to that entry and stops
 narrowing. Typing `gits` shows you the `g` entry and nothing else.
 
 This is why sections pick letters carefully. It is also the one place where this
-menu behaves differently from the [palette](palette.md), which is fuzzy
+menu behaves differently from the palette, which is fuzzy
 throughout and never short-circuits on a letter.
 
 ## What is in the menu
 
-`vim-menu` defines four sections of its own:
+vim's `with` entry on `menu` defines four sections of its own:
 
 | section | what it does |
 | --- | --- |
@@ -52,24 +52,24 @@ throughout and never short-circuits on a letter.
 | Build | `make`, `make test` |
 | Shell | a custom command, the environment, network info |
 
-Four more come from other integrations, and they are the clearest example of why
+Four more come from other `with` entries, and they are the clearest example of why
 this plugin exists as a separate thing:
 
 | order | section | from | what it does |
 | --- | --- | --- | --- |
-| 20 | Tree | `vim-treeview` | refresh, and jump into the file tree |
-| 30 | Git | `vim-git` | status, log, diff, add, commit, push, pull, branches |
-| 40 | Search | `vim-search` | find, replace, project search |
-| 80 | CDIN-X | `vim-plugin-manager` | the extension manager |
+| 20 | Tree | vim `with` on `treeview` | refresh, and jump into the file tree |
+| 30 | Git | vim `with` on `git` | status, log, diff, add, commit, push, pull, branches |
+| 40 | Search | vim `with` on `search` | find, replace, project search |
+| 80 | CDIN-X | vim `with` on `menu` | the extension manager |
 
-`vim-treeview` also registers the menu's only context provider, at priority
-200 — which is why the title shows the tree's state rather than
-`vim-menu`'s own idea of it.
+The `with` entry on `treeview` also registers the menu's only context provider,
+at priority 200 — which is why the title shows the tree's state rather than the
+`with` entry's own idea of it.
 
 `git` is a whole capability — process discovery, status, ignore rules — and it
-knows nothing about menus. `vim-git` is the one file that knows both. Uninstall
-`vim-git` and the Git section disappears cleanly; `git` keeps working, because
-it never knew the section was there.
+knows nothing about menus. The `with` entry on `git` is the one file that knows
+both. Remove `git` and the Git section disappears cleanly; `git` itself keeps
+working, because it never knew the section was there.
 
 ## Building on it
 
@@ -110,12 +110,16 @@ Sections run in ascending `order`, and equal orders run in registration order �
 so a section that has to come first should say so rather than rely on who
 loaded first.
 
-`menu.extend` **asserts** that the menu exists. So if you are extending
-`vim.main`, depend on `vim-menu` — the integration that *defines* that menu —
-and not merely on `menu`, the capability that owns menus. The catalog is
-scanned with `pairs()`, so load order is not stable between runs, and getting
-it wrong gives you `menu is not defined: vim.main` on some runs and not others.
-It is the worst shape a load-order bug can have.
+`menu.extend` **asserts** that the menu exists. That is a deliberate sharp edge,
+and it is why `vim.main` is defined in `vim/init.lua` rather than inside
+`with/menus.lua`: the menu has to be defined before anything can extend it, and
+`init.lua` is the one place that is guaranteed to run first.
+
+**A `with` entry is the right way to extend another package's menu**, because the
+kernel only builds an entry once its partner is already up. There is no
+`menu is not defined: vim.main` on some runs and not others any more — the failure
+that used to need an ordering dance to avoid cannot happen when the ordering is
+the mechanism.
 
 ```lua
 menu.remove_extension("vim.main", "my-section")
@@ -159,8 +163,8 @@ menu.open("vim.main", { label = "something else" })   -- with a context
 
 **This plugin registers no commands and binds no keys.** Every keystroke in the
 table above belongs to `core.command_view`, the host's prompt. `menu` is six
-functions and a registry; if you have `vim-menu` you get the <kbd>M</kbd>
-binding from that integration, not from here.
+functions and a registry; with `vim` installed you get the <kbd>M</kbd>
+binding from the `with` entry, not from here.
 
 **A menu is a name and a lookup, not a thing.** `define` puts a spec in a table
 keyed by a string; `open(name)` looks it up and runs it. Nothing holds a
@@ -207,14 +211,13 @@ and you see the other.
 
 **`define` is destructive.** It replaces the whole entry for a name, dropping
 every provider and context registered against it. Re-defining `vim.main` after
-other integrations have extended it silently removes their sections; nothing
+other `with` entries have extended it silently removes their sections; nothing
 warns.
 
 **Unload is one line.** It sets `core.menu = nil` and removes no section,
-because the plugin keeps no registry of who extended what. If you care that
-your sections disappear, your integration's own `unload()` has to do it — and
-`vim-menu`'s does not, which is why uninstalling it can leave a stale `vim.main`
-in the table.
+because the package keeps no registry of who extended what. If you care that your
+sections disappear, your own `disable()` has to do it — and vim's `with` entry on
+`menu` does, which is why removing it can leave a stale `vim.main` in the table.
 
 ## Files
 

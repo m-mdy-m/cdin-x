@@ -2,7 +2,8 @@
 
 Modal editing, and the `:` command line.
 
-One of two plugins marked `essential` — the other is `manager`. A cdin build copies it in, because
+One of two packages every bundle ships - the other is `manager`. A cdin build
+copies it in, because
 an editor with no other modal editing isn't an editor, and it is loaded whether
 or not you install anything else. <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>V</kbd>
 turns it off if you would rather type normally.
@@ -246,7 +247,7 @@ These are vim's own, and they are always available:
 | `:rm path` | remove a file |
 | `:rename old new` | rename, and repoint any open document |
 | `:copy src dst` / `:move src dst` | copy or move a file |
-| `:wincmd {c}` | the same characters as <kbd>Ctrl</kbd>+<kbd>W</kbd> — see [window](window.md) |
+| `:wincmd {c}` | the same characters as <kbd>Ctrl</kbd>+<kbd>W</kbd> — see [window](workspace.md#window) |
 | `:help` | the in-editor key reference |
 | `:!cmd` | run a shell command |
 
@@ -280,17 +281,17 @@ windows to. The choice of interactive shell is remembered in
 Tabs. The file tree. Search. Git. Splits. The extension manager. The menu.
 
 This is not an omission, and it is the design decision the whole plugin rests
-on. If vim mode had its own `:tabnew`, then uninstalling the tab plugin would
-leave a `:tabnew` that quietly did nothing — and you would have no way to tell
-that from a broken one. So vim mode offers **seams** instead, and
-[`X/integration/vim/`](../../X/integration/vim) is where those get filled.
+on. If vim mode had its own `:tabnew`, then uninstalling the tab package would
+leave a `:tabnew` that quietly did nothing - and you would have no way to tell
+that from a broken one. So vim mode offers **seams** instead, and seven
+**`with` entries** inside `vim` itself are where those get filled.
 
 Press <kbd>M</kbd> for the extension manager or <kbd>m</kbd> for the menu, and
-neither of those keys is in vim core either. They come from integrations that
-register them. If you press <kbd>m</kbd> and nothing happens, `vim-menu` is not
-installed.
+neither of those keys is in vim core either. They come from `with` entries that
+register them. If you press <kbd>m</kbd> and nothing happens, the `menu` package
+is not installed.
 
-**What each installed integration adds:** [vim-integrations.md](vim-integrations.md).
+**What each entry adds:** [what vim is wired to](vim-integrations.md).
 
 ## How it works
 
@@ -361,15 +362,20 @@ vim mode itself — the status bar owns its own drawing and offers a seam.
 
 **The ex command set is a registry, not a table.** `ex/commands.lua`
 registers its commands through the same `registry.register_command` that
-integrations use, which is why `:tabnew` appears in `:help` and in completion
-only when the tab plugin is actually installed. The registry collects every
-distinct `help` string and prints them in registration order.
+`with` entries use, which is why `:tabnew` appears in `:help` and in completion
+only when the `workspace` package is actually installed. The registry collects
+every distinct `help` string and prints them in registration order.
 
-**Essential means self-contained** — for *this* plugin. The bundler copies it *alone* into
-a build, so every `require "X.…"` inside it resolves within its own subtree.
-`make validate` checks that, and there is no other way to catch it that isn't a
-built binary. The cost of that rule is exactly the seam design above: vim
-cannot reach for a sibling, so it has to offer something instead.
+**Vim is not required to be self-contained, and is not.** That rule existed
+because an `essential` package was copied *alone* into a build, so every
+`require "X.…"` inside it had to resolve within its own subtree. A bundle is a
+*closure* now — the listed packages and their `depends` — so `manager` can live in
+`cdinx/` and ship beside vim without declaring anything, and there is nothing left
+to check by hand.
+
+What vim still cannot do is reach for a sibling, and that is the point: it has to
+offer a seam instead, and `make validate` checks that the only thing reaching a
+sibling is a `with` entry.
 
 ## Extending it
 

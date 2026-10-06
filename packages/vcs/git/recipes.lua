@@ -1,9 +1,9 @@
 -- Shell recipes for common git operations.
 --
 -- These are command *strings*, not cdin commands: nothing registers them
--- and nothing binds a key to them. They exist so integrations share one
--- spelling of each invocation instead of each hardcoding its own — see
--- X/integration/vim/with/git.lua, which runs every one of these through
+-- and nothing binds a key to them. They exist so every package that runs git
+-- shares one spelling of each invocation instead of each hardcoding its own.
+-- See `vim`'s `with/git.lua` entry, which runs every one of them through
 -- vim.shell.run_in_buffer().
 --
 -- Named `recipes` rather than `commands` on purpose: in this codebase

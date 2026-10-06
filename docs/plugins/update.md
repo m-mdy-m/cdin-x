@@ -1,7 +1,13 @@
-# autoupdate
+# update
 
 Asks whether there is a newer cdin, and badges the status bar until you
 dismiss it.
+
+> **Renamed.** This package was `autoupdate` and is now `update`, because
+> "autoupdate" described a behaviour that is gone: this checks, and does not
+> update anything (see below). Its commands are `autoupdate:check` and
+> `autoupdate:skip-version`, and they are **unchanged** — only the package
+> identity moved.
 
 | key | does |
 | --- | --- |
@@ -47,12 +53,17 @@ that must not block the frame loop.
 ## How it works
 
 ```text
-autoupdate/manager/fetcher.lua   the network call
-autoupdate/manager/utils.lua     version comparison, platform split
-autoupdate/impl.lua              the badge and its dismissal
-autoupdate/commands.lua          registration only
-autoupdate/keymap.lua            registration only
+update/manager/fetcher.lua   the network call
+update/manager/utils.lua     version comparison, platform split
+update/impl.lua              the badge and its dismissal
+update/commands.lua          registration only
+update/keymap.lua            registration only
 ```
+
+Note that the *directory* is `update` and the *commands* say `autoupdate`. That is
+deliberate, and it is the same rule [complete](complete.md) follows: the package
+name is identity and is free to change; a command name is a string in somebody's
+configuration and is not.
 
 **The badge is a wrapper around `StatusView.get_items`.** It saves the original,
 and splices three cells onto the *front* of the right-hand group — `style.text`,

@@ -76,7 +76,7 @@ vim mode would be silently off with no obvious cause — every gate tests
 
 `vim-git:status`, `vim-menu:open`, `vim-fmenu:open`, `vim-shell:git-log` and every
 keystroke are exactly as they were. Only the package and directory names moved:
-`X.core.vim.registry` is now `vim.registry`, and `X/integration/vim/vim-git/` is
-now `X/core/vim/with/git/`.
+`X.core.vim.registry` is now `vim.registry`, and the `vim-git` integration is now
+the `with/git.lua` entry inside `vim`.
 
 Details: [docs/writing-a-plugin.md](../../docs/writing-a-plugin.md).

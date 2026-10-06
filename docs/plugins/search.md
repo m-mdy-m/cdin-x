@@ -35,7 +35,7 @@ knowing before you go looking for the option:
 | `find-replace:find-pattern` | the text as a **Lua pattern** |
 
 `find-pattern` is the same prompt with `pattern = true`, and it is what
-`vim-search`'s <kbd>*</kbd> is not — that one takes the word under the cursor
+the vim `with` entry's <kbd>*</kbd> is not — that one takes the word under the cursor
 and searches for it literally, which is the safe reading.
 
 ## Replacing
@@ -87,12 +87,12 @@ attached to whatever pane is focused when the search finishes.
 
 ## In vim mode
 
-If `vim-search` is installed, <kbd>/</kbd> opens the same prompt, <kbd>n</kbd>
+With `vim` installed, <kbd>/</kbd> opens the same prompt, <kbd>n</kbd>
 repeats it, <kbd>N</kbd> repeats it backwards, and <kbd>*</kbd> searches for the
 word under the cursor. <kbd>*</kbd> with no word under the cursor deliberately
 does nothing rather than opening an empty search.
 
-It also adds a **Search** section to [the vim menu](menu.md), with its own
+It also adds a **Search** section to [the menu](menu.md), with its own
 single-letter keys.
 
 ## How it works
@@ -107,8 +107,8 @@ search/commands.lua, keymap.lua   registration only
 ```
 
 **`buffer.lua` and `project.lua` register nothing.** Commands and bindings live
-in their own files, so an integration can use the search API without also
-inheriting search's keys. `vim-search` is exactly that case: it reaches the
+in their own files, so another package can use the search API without also
+inheriting search's keys. The vim `with` entry on `search` is exactly that case: it reaches the
 commands by name and claims no bindings of its own beyond the four vim keys.
 
 **`manager/` holds the state**, because both halves need to agree on what the

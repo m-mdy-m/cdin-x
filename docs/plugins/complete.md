@@ -1,6 +1,20 @@
-# autocomplete
+# complete
 
 Symbol completion for open documents.
+
+> **Renamed.** This package was `autocomplete` and is now `complete`. Its commands
+> are spelled `autocomplete:complete`, `autocomplete:previous`,
+> `autocomplete:next` and `autocomplete:cancel`, and they are **unchanged** —
+> a user's `init.lua` and a keymap both name them. Only the package identity moved,
+> and a `require` is spelled after it:
+>
+> ```lua
+> local ac = require "complete.api"    -- was "X.core.autocomplete.api"
+> ```
+>
+> `core.autocomplete` is also still set, and still points at the same table, because
+> `init.lua` assigns it. That is the other half of the rule: **rename the package,
+> never the API someone is already calling.**
 
 Type three characters and a list appears. <kbd>Tab</kbd> takes the highlighted
 one, <kbd>↑</kbd> and <kbd>↓</kbd> move, <kbd>Esc</kbd> dismisses.
@@ -25,7 +39,7 @@ A provider supplies items. Nothing here knows where they came from, and the
 popup fuzzy-matches whatever it is handed against what you have typed.
 
 ```lua
-local ac = require "X.core.autocomplete.api"
+local ac = require "complete.api"
 
 ac.set {
   name  = "my-language",      -- ac.set takes ONE argument; see below.
@@ -82,7 +96,7 @@ symbols you cannot see is worse than a short accurate one.
 editor has no event system, so `RootView.on_text_input`, `RootView.update` and
 `RootView.draw` are each wrapped, the original called, and the originals put
 back on unload. That is the pattern this whole repository uses for extending the
-runtime, and autocomplete is the clearest example of why: the alternative would
+runtime, and completion is the clearest example of why: the alternative would
 be a core that knows about completion.
 
 **`ITEM_MT` exists so `tostring` returns the text.** The fuzzy matcher scores

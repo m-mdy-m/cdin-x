@@ -1,7 +1,6 @@
 # treeview
 
-The project file tree. Files, directories, and — with
-[`git-treeview`](../../X/integration/git-treeview) installed — git state on them.
+The project file tree. Files, directories, and their state.
 
 | key | does |
 | --- | --- |
@@ -39,15 +38,15 @@ top of `init.lua` says eighteen.
 
 ## In vim mode
 
-With `vim-treeview` installed:
+With `vim` installed:
 
 | key | does |
 | --- | --- |
 | `:tree` / `:trees` | focus the tree and refresh it |
 
-That is the whole of it, and it is worth being precise about why. `vim-treeview`
-registers **no keys** — it is two files, and the only thing in them is an
-ex-command. The arrows and <kbd>Enter</kbd> you use inside the tree are
+That is the whole of it, and it is worth being precise about why. The `with`
+entry on `treeview` registers **no keys** — it is two small files, and the only
+thing in them is an ex-command. The arrows and <kbd>Enter</kbd> you use inside the tree are
 `treeview`'s own bindings, and they work in vim mode for a structural reason
 rather than a plugin one: when the tree has focus, vim mode is not the thing
 handling your keystrokes, so the editor's keymap answers instead.
@@ -78,8 +77,8 @@ What it does is flip `config.show_hidden_files` and write `config.ignore_files`
 to `"^$"` or `"^%.`. **That is a dotfile pattern, not git's answer**, and it
 needs no git plugin — the earlier claim that it consulted `.gitignore` was
 wrong. The second half matters more: `ignore_files` belongs to the host's
-project scanner, not to this plugin, so toggling it also changes what
-[`finder`](finder.md) offers and what `search` scans. It is a global switch
+project scanner, not to this package, so toggling it also changes what
+`launcher`'s `finder` feature offers and what `search` scans. It is a global switch
 wearing a treeview's name.
 
 Hidden files are **shown** by default.
@@ -103,10 +102,10 @@ already-scanned `core.project_files` and skips collapsed subtrees. So the tree
 shows what the project scanner saw — which is why `ignore_files` affects it,
 and why a file the scanner has not reached yet does not appear.
 
-**`api.lua` is the registry integrations extend, not the plugin's own API.**
+**`api.lua` is the registry another package extends, not this one's own API.**
 A plugin's public surface here is `core.treeview` — the view instance, set in
-`init.lua` and cleared on unload, which is what `git-treeview` reads badges
-from. `api.lua` is the *other* direction: `register_badge_provider`,
+`init.lua` and cleared on unload. `api.lua` is the *other* direction:
+`register_badge_provider`,
 `register_refresh_provider`, and the `get_badge` / `refresh_providers` functions
 the host calls. The distinction matters because it is why `api.lua` and
 `init.lua` can be separate files without a second copy of anything: the manager
@@ -162,7 +161,7 @@ everywhere else and wins on the stroke — provided something on the tree's side
 declines too, because a stroke is a fallback chain and `keymap.add` prepends.
 Hence `treeview:toggle-key`: a command that exists only to give this one
 keystroke a predicate, the same trick `rename-key` and `delete-key` use.
-`treeview:toggle` itself is untouched, so the palette and every integration can
+`treeview:toggle` itself is untouched, so the palette and every other package can
 still toggle the tree from the log view.
 
 **The pane is not removed on unload.** `unload()` clears `core.treeview` and
@@ -186,4 +185,4 @@ teardown — will collide with it, and the winner is decided by load order.
 | `nav.lua` | movement and expansion |
 | `cache.lua` | what is on screen (LRU, 4096 entries) |
 | `readonly.lua` | the read-only cache, for badges |
-| `api.lua` | the provider registry integrations extend |
+| `api.lua` | the provider registry another package extends |

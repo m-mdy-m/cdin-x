@@ -1,44 +1,41 @@
 # Plugins
 
-One page per plugin: what it does, what you press, and how it works.
+One page per package: what it does, what you press, and how it works.
 
 Read the page for the thing you're about to use. The "how it works" half is
-there for when a plugin does something you didn't expect and you'd rather know
+there for when something does something you didn't expect and you'd rather know
 why than guess.
 
-## The capabilities
+## The packages
 
-One thing each. Install from the manager and they work on their own.
+One subject each. Install from the manager and they work on their own.
 
-| page | plugin | what it is |
+| page | package | what it is |
 | --- | --- | --- |
-| [manager](manager.md) | `manager` | the extension panel — **always bundled**, like vim |
-| [vim](vim.md) | `vim` | modal editing and the `:` command line — **always loaded** |
+| [manager](manager.md) | the panel | the extension panel — **in every build**, like vim |
+| [vim](vim.md) | `vim` | modal editing and the `:` command line |
 | [search](search.md) | `search` | find, replace, and search across the project |
-| [menu](menu.md) | `menu` | the generic searchable menu other plugins build on |
+| [menu](menu.md) | `menu` | the generic searchable menu other packages build on |
 | [git](git.md) | `git` | running git, and repository status |
 | [treeview](treeview.md) | `treeview` | the project file tree |
-| [tab](tab.md) | `tab` | tabs |
-| [window](window.md) | `window` | splits, focus, layout |
-| [finder](finder.md) | `finder` | open a file or folder by name |
-| [palette](palette.md) | `palette` | run any command by name |
-| [session](session.md) | `session` | what survives a restart |
-| [autocomplete](autocomplete.md) | `autocomplete` | symbol completion |
-| [modules](modules.md) | `modules` | reload a module, open your config |
-| [autoupdate](autoupdate.md) | `autoupdate` | is there a newer cdin |
-| [autoreload](autoreload.md) | `autoreload` | pick up files changed outside the editor |
-| [trimwhitespace](trimwhitespace.md) | `trimwhitespace` | strip trailing whitespace on save |
-| [optional](optional.md) | three | RTL, theme switching, Unicode inspection |
+| [workspace](workspace.md) | `workspace` | tabs, window splits, and what survives a restart |
+| [launcher](launcher.md) | `launcher` | the palette, file finder, and config shortcuts |
+| [complete](complete.md) | `complete` | symbol completion |
+| [update](update.md) | `update` | is there a newer cdin |
+| [basics](basics.md) | `basics` | pick up external edits, strip trailing whitespace |
+| [text-tools](text-tools.md) | `text-tools` | right-to-left text, Arabic shaping, Unicode inspection |
+| [themes](themes.md) | `themes` | the bundled themes, and switching between them |
 
-## The integrations
+## Two things a package can be made of
 
-Thin plugins that connect two capabilities that must not know about each
-other. Installing one is what gives you a feature; the capability itself does
-nothing without it.
+A package may be split into **features** — parts you can switch off — and it may
+declare **`with` entries** — wiring to a *different* package that runs only while
+both are loaded. The pages above use both where it applies, and say so.
 
-| page | what you get |
+| you want to read | because |
 | --- | --- |
-| [vim integrations](vim-integrations.md) | every `vim-*` integration, and what each one adds to vim mode |
+| [workspace](workspace.md), [basics](basics.md), [text-tools](text-tools.md) | these are feature packages: the page names each feature and what switching it off removes |
+| [vim](vim.md), [themes](themes.md), [git](git.md) | these have `with` entries: something here is wired to something there, and only runs when both are loaded |
 
 ## Making your own
 
@@ -46,10 +43,11 @@ Separate, because these are for writing rather than using.
 
 | page | for |
 | --- | --- |
-| [building an integration](../building/an-integration.md) | connecting two plugins — with `git` and `window` worked through end to end |
+| [building a feature](../building/a-feature.md) | splitting a package into parts a user can switch off |
+| [building a with entry](../building/a-with-entry.md) | connecting two packages that must not know about each other |
 | [adding a theme](../building/a-theme.md) | a theme, and where every colour in the editor comes from |
 | [adding a syntax definition](../building/a-syntax-definition.md) | highlighting a language |
-| [writing a plugin](../writing-a-plugin.md) | the whole shape of a plugin, before any of the above |
+| [writing a plugin](../writing-a-plugin.md) | the whole shape of a package, before any of the above |
 
 ## What every page has
 
@@ -63,5 +61,24 @@ word-selection without either of them knowing.
 key, that is deliberate and the page says so.
 
 **How it works** is the part worth reading when something surprises you. It
-tends to explain a rule the plugin obeys, and the failure the rule exists to
+tends to explain a rule the package obeys, and the failure the rule exists to
 prevent.
+
+## Naming, once
+
+Two package names changed when packages gained a `package.lua`, and the old
+names are what a search will still turn up:
+
+| you will find | is now |
+| --- | --- |
+| `autocomplete` | [`complete`](complete.md) |
+| `autoupdate` | [`update`](update.md) |
+
+Their **commands kept their old names** — `autocomplete:complete` and
+`autoupdate:check` are spelled exactly as before — because a user's `init.lua`
+and a keymap both name them, and renaming those would break working
+configuration. Only the package identity moved.
+
+`palette`, `finder` and `modules` are no longer packages either; they are three
+features of [`launcher`](launcher.md). `tab`, `window` and `session` are features
+of [`workspace`](workspace.md).

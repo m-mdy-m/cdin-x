@@ -20,7 +20,7 @@
 --   set_theme(n)  record the active theme and save immediately, so a
 --                 choice made mid-session survives a crash rather than
 --                 only a clean exit. Called by
---                 X/integration/session/theme-switcher.
+--                 the themes package's with/themes.lua.
 local core   = require "core"
 local config = require "core.config"
 local Doc    = require "core.doc"
@@ -116,7 +116,7 @@ end
 -- on_quit is the supported way for another plugin to persist state when
 -- cdin exits. session owns the single wrap of core.quit; a plugin that
 -- wrapped it as well would risk dropping the call chain. See
--- X/integration/tab-session for the only current user.
+-- the workspace package's tab-session feature, for the only current user.
 local _on_quit = {}
 
 function M.on_quit(fn)
@@ -133,7 +133,7 @@ end
 -- Record the active theme and persist right away, so a theme chosen during
 -- a session survives even if cdin does not exit cleanly. core.quit also
 -- writes config.theme, but only on a normal exit. Called by
--- X/integration/session/theme-switcher.
+-- the themes package's `with/themes.lua` entry.
 function M.set_theme(name)
   if not name then return end
   state.theme = name

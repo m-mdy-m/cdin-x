@@ -2,18 +2,17 @@
 
 The panel: what is installed, what is available, and what you can change.
 
-`essential = true` — one of three things a cdin build bundles, with `vim` and
-the `default` theme. That is the whole argument for it: everything the manager
-*offers* stays optional, and what is not optional is being able to ask what is
-installed and change it. A build with nothing else installed still has a panel
-a keystroke away.
+One of two packages every bundle ships, with `vim`. That is the whole argument
+for it: everything the manager *offers* stays optional, and what is not optional
+is being able to ask what is installed and change it. A build with nothing else
+installed still has a panel a keystroke away.
 
 ## Keys
 
 | key | does |
 | --- | --- |
 | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>M</kbd> | open / close |
-| <kbd>M</kbd> | the same, in vim normal mode, with `vim-plugin-manager` installed |
+| <kbd>M</kbd> | the same, in vim normal mode, with `vim` and `menu` installed |
 | <kbd>J</kbd> / <kbd>K</kbd>, <kbd>↓</kbd> / <kbd>↑</kbd> | move |
 | <kbd>/</kbd> or <kbd>Ctrl</kbd>+<kbd>F</kbd> | search |
 | <kbd>Space</kbd> / <kbd>Return</kbd> / <kbd>X</kbd> | enable or disable |
@@ -27,9 +26,9 @@ a keystroke away.
 | <kbd>[</kbd> / <kbd>]</kbd> | narrower / wider |
 | <kbd>Esc</kbd> | close |
 
-**<kbd>M</kbd> is not the manager's.** It is claimed by
-`vim-plugin-manager` through vim's own registry, so it works in vim normal mode
-only, and only when that separately-removable integration is installed. The
+**<kbd>M</kbd> is not the manager's.** It is claimed by vim's `with` entry on
+`menu` through vim's own registry, so it works in vim normal mode only, and only
+when the `menu` package is installed. The
 panel binds <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>M</kbd> globally instead,
 because a global <kbd>Shift</kbd>+<kbd>M</kbd> is also how you type a capital
 `M` — bound globally it opened the panel from insert mode and from the <kbd>:</kbd>
@@ -62,7 +61,7 @@ which is a fourth piece of status information the sections do not show.
 
 **Details are not the same list every time.** <kbd>D</kbd> offers *Install* for
 something available, *Enable / Disable / Update / Uninstall* for something
-installed, *Locked* only for something locked or essential, and *Open README* and
+installed, *Locked* only for something a bundle shipped, and *Open README* and
 *Back* always.
 
 ## Search
