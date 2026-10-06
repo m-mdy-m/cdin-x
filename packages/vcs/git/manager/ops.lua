@@ -23,31 +23,25 @@ function M.popen(cmd)
 end
 
 -- ── extension-registry fetching ───────────────────────────────────────────
--- Fetching the cdin-x registry is a git operation, so it belongs here rather
--- than in core. core/manager/registry.lua only knows a syncer may exist; the
--- git extension registers one (see api.lua's M.register).
-
-local function quote(s)
-  s = tostring(s)
-  if Utils.IS_WIN then
-    return '"' .. s:gsub('"', '\\"') .. '"'
-  end
-  return "'" .. s:gsub("'", "'\\''") .. "'"
-end
-
-local function succeeded(a, b, c)
-  if a == true then return true end
-  if type(a) == "number" then return a == 0 end
-  if type(c) == "number" then return c == 0 end
-  return false
-end
-
-local function run(cmd)
-  local git = M.exe()
-  if not git then return false, "git executable not found" end
-  local a, b, c = os.execute(cmd)
-  if succeeded(a, b, c) then return true end
-  return false, "git command failed: " .. cmd
-end
+-- Nothing. Fetching the cdin-x registry is not a git operation.
+--
+-- This header and the three helpers under it were the git path: `quote` and
+-- `succeeded` for `os.execute`, and `run` for the git commands themselves. They
+-- were kept when 0.1.0 dropped git fetching because a removal is easy to undo and a
+-- forgotten reference is not -- and then nothing referenced them again, so they sat
+-- here as the only dead code in the package.
+--
+-- `os.execute` is also the reason to leave them gone. Its return shape is the one
+-- genuinely unportable thing in this file: Lua 5.1 returns an exit code as the first
+-- value, 5.2+ returns `true` or `nil` plus a string, and a Windows shell that
+-- cannot find the program looks like a successful one. `succeeded` was three
+-- branches of guesswork about that, and nothing that ships should.
+--
+-- The registry is downloaded over HTTPS by `cdinx/manager/fetch.lua`, one file plus
+-- the files of the one extension being installed. git is not used to install
+-- cdin-x extensions at all, and `Manager.set_registry_syncer` -- the hook this path
+-- was supposed to fill -- has no callers either. That is a deliberate seam, not an
+-- oversight: a third-party extension may want to provide a faster sync, and the
+-- seam costs one comparison in `registry.refresh`.
 
 return M

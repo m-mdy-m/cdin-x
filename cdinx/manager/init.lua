@@ -264,6 +264,12 @@ function Manager.list_local()
   return Catalog.list_by_source(ctx, "installed")
 end
 
+-- The packages the host loaded itself, plus everything the manager loaded.
+--
+-- No caller in either repository. Kept for the same reason as `get_locked_names`:
+-- it is the answer to a question a caller will want, and it costs one line. Unlike
+-- `Manager.installed` -- which is the same table -- it does not need the caller to
+-- know which field of the facade is the live one.
 function Manager.list_loaded()
   return Manager.installed
 end
@@ -309,9 +315,18 @@ function Manager.is_locked(name)
   return plugin._source == "builtin" or plugin._source == "provided"
 end
 
+-- Where a package's README is, or nil.
+--
+-- Only `open_readme` calls this, and it calls it by name rather than inlining it,
+-- because a path is the kind of answer a caller will want to show rather than open:
+-- the panel's details row, a log line, a third-party panel. It is public for that
+-- reason, not because two callers happen to exist today.
 function Manager.get_readme(name)
   local plugin = Manager.available[name]
   if not plugin then return nil end
+  -- A single-file package has no directory to hold one. Asking anyway would build
+  -- `.../theme.lua/README.md`, which cannot exist, so the check is the answer rather
+  -- than a precaution.
   if plugin._single_file then return nil end
   local path = Util.join(plugin._path, "README.md")
   if Host.fs.is_file(path) then return path end
@@ -322,6 +337,10 @@ function Manager.open_readme(name)
   local plugin = Manager.available[name]
   if not plugin then return false, "unknown extension: " .. tostring(name) end
 
+  -- `get_readme` is inlined rather than called, which looks like a missed
+  -- abstraction and is actually the opposite: it is one line, it has exactly one
+  -- caller, and calling across the facade for it would mean the path question --
+  -- single-file or not -- is answered in two places.
   local path = Manager.get_readme(name)
   if path then
     Host.core.root_view:open_doc(Host.core.open_doc(path))
@@ -347,6 +366,15 @@ end
 -- What the panel wants to draw as "always on" is a *build* package: something the
 -- bundle shipped, which is not removable and not switchable, because the host
 -- loads it. That is `is_locked`, and it is what the panel already uses.
+--
+-- No caller: the panel asks `is_locked` per row rather than listing them once, and
+-- a set of names it does not use is a second answer to a question that already has
+-- one. Kept because it is the natural shape for a caller that does want the whole
+-- list, and because the alternative -- removing it and having the next person
+-- rebuild it from `is_locked` -- is more work than leaving one function.
+--
+-- Unlike `load_plugin` and `unload_plugin`, which cdin's own `test_workflows.lua`
+-- calls, this one has no caller anywhere in either repository.
 function Manager.get_locked_names()
   merge_sources()
   local names = {}

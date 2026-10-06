@@ -75,19 +75,15 @@ function Host.sleep(seconds)
   system.sleep(seconds)
 end
 
---- Joins path segments with the host's separator.
---- @vararg string
---- @return string
-function Host.join(...)
-  local out = tostring((...))
-  for i = 2, select("#", ...) do
-    local part = tostring((select(i, ...)))
-    if out:sub(-1) ~= "/" and out:sub(-1) ~= "\\" then
-      out = out .. Host.sep
-    end
-    out = out .. part
-  end
-  return out
-end
+-- Removed: `Host.join`. `Util.join` does the same job -- it inserts `Host.sep`
+-- between segments -- and it is the one with callers: 23 of them. Two functions for
+-- one operation, where the unused one is also subtly worse (it stringifies its
+-- arguments, so a number or a nil segment becomes text instead of failing), is a
+-- duplicate that survives because removing the *unused* copy reads as tidying rather
+-- than as a decision.
+--
+-- This file is the single reader of the host's globals and its modules. Joining
+-- path segments is not reading the host, it is string handling, so it belongs in
+-- util -- and now it is only there.
 
 return Host
