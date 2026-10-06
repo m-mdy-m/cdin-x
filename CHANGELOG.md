@@ -9,9 +9,88 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **Packages, and everything optional inside one.** What a build ships is decided by
+  a bundle in `bundles/` rather than by an `essential` flag in a manifest. `essential`
+  is gone and nothing replaces it: `standard` is `{ vim, themes }`, `minimal` is the
+  kernel alone, `empty` is the kernel with no fonts, and
+  `scripts/bundle.py --bundle <name>` picks which. The catalog is 18 packages, down
+  from 26.
+- **A package's identity is its `name`, not its path.** `package.lua` is pure data,
+  read and validated in a sandbox and never executed, so `require "git.api"` works
+  wherever the files live. `entry` may name any file, so a single-file package and a
+  directory of modules are the same kind of thing.
+- **Features: parts of a package you can switch off.** A package declares
+  `features = { tab = { default = true } }` and each is a `features/<key>.lua` with an
+  `enable()` and a `disable()`. One that nobody enabled is never required, so its
+  commands, its keymap and its module state are never built.
+- **`with` entries: two packages that need each other without depending on each
+  other.** One file, named in `package.lua` against the other package, run only while
+  both are loaded and torn down when either leaves. `themes` pushes the chosen theme
+  into the session's saved state this way, as do vim's git, search, tab, treeview and
+  window bindings and git's status badges.
+- **`<user_root>/packages.lua`** — the user's own choices, readable and editable, read
+  in a sandbox. It names packages to switch off and features to switch off, and what
+  it writes is checked against the catalog at boot: a name that matches nothing is
+  reported by name, with a near-miss offered where one is close.
+- **The panel can switch a feature.** Feature rows appear indented under their package
+  showing whether each is on, whether that is the user's choice or the package's
+  default, and whether it is actually running. `f` toggles the one under the cursor,
+  and the change is written before the row is redrawn so it is true this frame rather
+  than a promise about the next start.
+- **Host version compatibility is checked.** All twelve packages declared
+  `min_cdin_version` and nothing compared it. Install now refuses a package the running
+  host cannot satisfy, saying what is needed and what this is.
+- **`scripts/check.lua`** — per-package rules, run by `make check`.
+
+### Changed
+
+- **`X/integration/` is gone.** Its eight packages existed only to wire two other
+  packages together, which is what a `with` entry is for. No command name, keystroke or
+  config key changed: `vim-git:status`, `vim-menu:open` and `core:find-command` are
+  spelled exactly as before, and only the module names and directories moved.
+- **One place reads the host.** `cdinx/host.lua` is the single reader of host globals
+  and modules, which took the tree from three undefined globals to none.
+- **`packages/` is a required install root again.** It was optional while the move out
+  of `X/` was in progress and themes still lived there. They have moved, so a site
+  install is four roots or it is a broken one.
+
 ### Fixed
 
-- **vim 0.3.3 — `:!` doubled every `"` before cmd saw it, on Windows.**
+- **The panel's feature switches did nothing.** The runtime read
+  `ctx.state.features`; `State.load` populated only `disabled` and `lock` and
+  `State.save` wrote only those, so the table was always nil, every declared default
+  won, and turning a feature off changed nothing — silently, with no warning.
+- **`min_cdin_version` meant nothing**, for the reason above: declared by every
+  package, shape-checked by the schema, compared by nothing.
+- **Four places still read `essential`**, a field the schema now refuses.
+  `get_essential_names` therefore returned an empty list to every caller; the orphan
+  guard in `Lifecycle.clean` protected nothing; and `disable`/`uninstall` had a dead
+  disjunct beside `_source == "builtin"`.
+- **`Packages.load` silently ignored any path not ending in `packages.lua`** — a guard
+  against a mis-set config key that turned a valid Windows temp path into a no-op
+  reporting no problems.
+- **The panel's `unregister` listed command names by hand** and the list had drifted:
+  it contained a name registered nowhere and omitted one that was.
+- **A misspelt package name in `packages.lua` was inert forever**, read and never
+  compared against anything.
+
+### Removed
+
+- **`essential`**, as a manifest field. Schema, `validate.lua` and `check.lua` all
+  refuse it.
+- **`X/themes/`** — themes are a package, and `bundle.py` flattens them to
+  `<data>/themes/<name>/` where the host reads them.
+- **`vim-menu`, `vim-git`, `vim-search`, `vim-tab`, `vim-window`, `vim-treeview`,
+  `vim-plugin-manager`, `git-treeview`** — now `with` entries or features.
+- **The manager package.** What it bootstrapped is `cdinx/`, which every bundle now
+  writes into the build along with its entry shim, so the panel is reachable without
+  a package being responsible for it.
+
+### Fixed (earlier, still unreleased)
+
+- **vim 0.3.3 - `:!` doubled every `"` before cmd saw it, on Windows.**
   `shell.capture` wrapped the command as `cmd /c "<cmd>"` and, to be safe,
   escaped each `"` inside it as `""`. That is the escape for CSV and PowerShell,
   not for cmd: cmd strips the outer pair and passes the rest through verbatim,

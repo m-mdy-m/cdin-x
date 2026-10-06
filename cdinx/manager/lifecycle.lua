@@ -8,6 +8,64 @@ local Fetch    = require "cdinx.manager.fetch"
 
 local Lifecycle = {}
 
+--- Whether the running host satisfies what a package asked for.
+---
+--- `min_cdin_version` is declared by every package and validated by the schema, and
+--- until now nothing compared it. That is the worst shape for a compatibility
+--- promise: it is written down, it is checked for shape, and it means nothing, so a
+--- package written against a newer host installs cleanly and then fails somewhere
+--- less obvious.
+---
+--- The comparison is here rather than at load because that is where the answer is
+--- actionable. At load the only available answer is "skip it", which produces an
+--- editor missing something with nothing in the log; at install the user is already
+--- looking at a decision and can be told why before making it.
+---
+--- Deliberately a *warning*, not a refusal. A package that declares a minimum it
+--- cannot meet has not been shown to be broken -- a patch release may well work --
+--- and refusing to install it would make cdin-x the thing deciding what a version
+--- number means. It says so and lets the user choose.
+---
+--- When the host does not report a version at all, this returns true. "Unknown" is
+--- not evidence of incompatibility, and refusing everything against a host that
+--- simply does not say would be the loudest possible wrong answer.
+--- @param plugin table
+--- @return boolean satisfied
+--- @return string|nil reason
+local function compatible_with_host(plugin)
+  local want = plugin.min_cdin_version
+  if not want or want == "" then return true end
+
+  local have = Host.version
+  if not have or have == "" then
+    -- Logged rather than silent: a user on a host that does not report its version
+    -- has just had a compatibility promise they cannot rely on, and that is worth
+    -- one line.
+    return true, string.format(
+      "cdin-x: %s asks for cdin %s but this editor does not report its version; "
+      .. "installing anyway", tostring(plugin.name), want)
+  end
+
+  -- Compare the release triple only. A pre-release suffix ("0.6.0-rc1") is not
+  -- something either side can order meaningfully here, and treating it as less than
+  -- the release would refuse a package against a build of the same version.
+  local function triple(v)
+    return tonumber(v:match("^(%d+)")), tonumber(v:match("^%d+%.(%d+)")), tonumber(v:match("^%d+%.%d+%.(%d+)"))
+  end
+  local wm, wn, wp = triple(want)
+  local hm, hn, hp = triple(have)
+  if not (wm and wn and wp and hm and hn and hp) then
+    -- An unparseable version is not a reason to refuse; say nothing and let it load.
+    return true
+  end
+
+  if hm > wm then return true end
+  if hm < wm then return false end
+  if hn > wn then return true end
+  if hn < wn then return false end
+  return hp >= wp
+end
+
 -- Where a plugin is copied inside the user's extension store.
 local function install_path_for(config, plugin)
   local rel = plugin._relpath
@@ -97,6 +155,17 @@ function Lifecycle.install(ctx, config, name, ensure_registry, save_state, stack
   if plugin._source == "provided" then
     return true, "provided by the editor"
   end
+
+  -- Said before the dependency walk, so a package that cannot work here does not
+  -- pull a chain of dependencies onto disk on the way to failing.
+  local satisfied, why = compatible_with_host(plugin)
+  if not satisfied then
+    return false, string.format(
+      "%s needs cdin %s or newer; this is %s", name, plugin.min_cdin_version,
+      tostring(Host.version))
+  end
+  if why then Host.core.log("cdin-x: %s", why) end
+
   stack = stack or {}
   if stack[name] then return false, "dependency cycle: " .. name end
 
@@ -186,6 +255,13 @@ function Lifecycle.install_local(ctx, config, path, install_fn, save_state)
   if not ok then return false, table.concat(errors, "; ") end
   meta.name = meta.name or fs.basename(path):gsub("%.lua$", "")
   meta._single_file = single_file
+
+  -- The same check as `install`, and for the same reason: this is the path that
+  -- puts a package onto disk without going through the catalog, so a package that
+  -- cannot work on this host would otherwise arrive here and nowhere else.
+  local satisfied, why = compatible_with_host(meta)
+  if not satisfied then return false, why end
+  if why then Host.core.log("cdin-x: %s", why) end
 
   for _, dep in ipairs(meta.dependencies or {}) do
     local existing = ctx.available[dep]

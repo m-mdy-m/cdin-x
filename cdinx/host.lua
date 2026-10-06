@@ -24,7 +24,17 @@ Host.is_windows = Host.sep == "\\"
 --- Captured once at load: it cannot change while the editor runs, and reading a
 --- global on every comparison would make a package's compatibility check depend
 --- on where in the file it happens to be.
-Host.version = rawget(_G, "VERSION")
+---
+--- The host pushes `VERSION` from C (`lua_setup_globals`), and it is that same
+--- value `empty_view.lua` shows in its logo -- so a build that renders "v0.6.1" and
+--- a package that reads 0.6.1 here agree by construction rather than by two
+--- lookups happening to match.
+---
+--- `CDIN_VERSION` is *not* a global. `config.c` uses that name as a C macro
+--- (`-DCDIN_VERSION=...`) and `empty_view.lua` looks for it as a Lua global that
+--- nothing ever sets, so the fallback there is always "dev". Read from both so a
+--- host that starts setting one is picked up without a change here.
+Host.version = rawget(_G, "VERSION") or rawget(_G, "CDIN_VERSION")
 
 --- The host's display scale, for anything that sizes itself in pixels.
 Host.scale = rawget(_G, "SCALE") or 1

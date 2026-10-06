@@ -2,11 +2,21 @@
 --
 -- `globals` is empty because nothing in this repository is allowed to create a
 -- global. `read_globals` holds what cdin provides and this repository reads.
--- Each name here is a global the host is known to define: the six it sets from C
--- (ARGS, VERSION, PLATFORM, SCALE, EXEFILE, PATHSEP), EXEDIR, and the two host
--- modules it exposes as globals (system, renderer) — both of which cdin-x code
--- already calls. Anything else that shows up as undefined is a bug to fix, not
--- a name to add: `core`, for instance, is a module and has to be required.
+-- Each name here is checked against cdin's source rather than remembered:
+--
+--   set from C in `lua_setup_globals`: ARGS, VERSION, PLATFORM, SCALE, EXEFILE,
+--     and LOGFILE
+--   set by cdin's Lua bootstrap:      PATHSEP, EXEDIR
+--   exposed as globals by C:          system, renderer
+--
+-- Two are listed defensively rather than because they exist today: `CDIN_VERSION`
+-- is a *C macro* (`-DCDIN_VERSION=...`) and is not a Lua global, but host.lua falls
+-- back to it in case a host starts setting one, and reading a global it does not
+-- define is not a bug. `LOGFILE` is real and unused -- a place where a log path is
+-- reachable without going through the log itself.
+--
+-- Anything else that shows up as undefined is a bug to fix, not a name to add:
+-- `core`, for instance, is a module and has to be required.
 std = "lua54"
 max_line_length = 100
 
@@ -20,7 +30,7 @@ globals = { "package.cdinx_store" }
 
 read_globals = {
   "ARGS", "VERSION", "PLATFORM", "SCALE", "EXEFILE", "EXEDIR", "PATHSEP",
-  "system", "renderer",
+  "system", "renderer", "CDIN_VERSION", "LOGFILE",
 
   -- `package.loaders` is the Lua 5.1 spelling of `package.searchers`, still read
   -- for a host that is that old. Read-only, so it belongs here rather than in
