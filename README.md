@@ -55,11 +55,12 @@ make install   # copy into the site directory
 make uninstall
 ```
 
-That writes three directories into cdin's **site directory** and nothing else:
+That writes four directories into cdin's **site directory** and nothing else:
 
 ```text
 <site>/cdinx/            the manager
-<site>/X/                the plugins
+<site>/X/                what has not moved into packages/ yet (vim)
+<site>/packages/         the first-party packages
 <site>/plugins/cdin-x/   the entry point cdin's loader finds
 ```
 

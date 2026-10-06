@@ -19,8 +19,8 @@ cd cdin-x
 make link
 ```
 
-That links three directories into cdin's **site directory** and writes nothing
-else. `make install` copies the same three instead, which is what you want if
+That links four directories into cdin's **site directory** and writes nothing
+else. `make install` copies the same four instead, which is what you want if
 you don't plan to edit this checkout. `make uninstall` takes them back out; your
 cdin installation is not touched by any of the three.
 
@@ -36,19 +36,22 @@ make link SITE=/somewhere/else         # or a full path
 
 ## What you get
 
-Three directories land in the site:
+Four directories land in the site:
 
 ```text
 <site>/cdinx/            the manager — the code that installs and loads plugins
-<site>/X/                the plugins themselves
+<site>/X/                what has not moved into packages/ yet — currently vim
+<site>/packages/         the first-party packages
 <site>/plugins/cdin-x/   one file, the entry point cdin's loader finds
 ```
 
 Two things are already there and do not come from here: **vim** and the
-**extension manager**. Both are marked `essential`, so a cdin build bundles them
-into the editor itself rather than installing them next to everything else. vim
-is already loaded by the time any site plugin runs; the manager is what opens
-the extension panel.
+**extension manager**. A cdin build bundles both into the editor itself rather
+than installing them next to everything else — that is what a *bundle* decides,
+and `bundles/standard.lua` is the one a default build uses. Nothing is marked
+essential any more; there is no such field, and a package that tried to declare
+one would be refused. vim is already loaded by the time any site plugin runs; the
+manager is what opens the extension panel.
 
 That's the whole split. cdin owns the editor and the mandatory set; this
 repository owns the rest, and nothing in a cdin checkout ever points at it.
@@ -65,7 +68,14 @@ the extension under the cursor, <kbd>I</kbd> installs, <kbd>U</kbd> removes,
 catalog came from, <kbd>Ctrl</kbd>+<kbd>R</kbd> re-downloads it, and
 <kbd>Esc</kbd> closes. <kbd>/</kbd> or <kbd>Ctrl</kbd>+<kbd>F</kbd> searches.
 
-If `vim-plugin-manager` is installed, <kbd>Shift</kbd>+<kbd>M</kbd> does the same
+A package with **features** — parts it can be split into — lists them indented
+underneath. <kbd>F</kbd> toggles the feature under the cursor, and the change is
+written to `packages.lua` in your config directory, so it survives a restart. A
+feature shown dim is still on its package's default; one shown in full colour is a
+choice you made. A package line reading `1/4 off` is telling you the same thing
+without expanding it.
+
+If `vim` is loaded, <kbd>Shift</kbd>+<kbd>M</kbd> does the same
 thing in vim normal mode. It is **not** bound globally on purpose: a global
 <kbd>Shift</kbd>+<kbd>M</kbd> is also how you type a capital `M`, and it would
 open the panel from insert mode and from the <kbd>:</kbd> prompt.

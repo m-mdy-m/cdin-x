@@ -8,7 +8,8 @@
 Three directories go into the site directory, and that is the whole install:
 
     <site>/cdinx/             the kernel
-    <site>/X/                 themes, and what has not moved into packages/ yet
+    <site>/X/                 what has not moved into packages/ yet -- which is
+                               now vim and the syntax definitions
     <site>/packages/          first-party packages
     <site>/plugins/cdin-x/    the entry plugin the host loads
 
@@ -39,18 +40,27 @@ import shutil
 import sys
 from pathlib import Path
 
-# (source, destination relative to the site directory). `packages/` is optional
-# during the move out of X/; `X/` is not, because themes still live there.
+# (source, destination relative to the site directory).
+#
+# `X/` and `packages/` are both required now. They were not always: during the move
+# out of X/, `packages/` did not exist yet and X/ held everything, so it was the one
+# that could not be optional. That is over -- themes are a package, vim is the last
+# entry in X/ -- and the two are a single install again. They stay as two entries
+# rather than one because they are two roots and either may move again, and
+# unpicking a merged directory is worse than adding a line here.
+#
+# What a build carries is a *bundle's* list and is scripts/bundle.py's job. A user
+# install is the whole catalog.
 PAYLOAD = [
     ("cdinx", "cdinx"),
     ("X", "X"),
+    ("packages", "packages"),
     ("plugins/cdin-x", "plugins/cdin-x"),
 ]
 
-# Installed only when present.
-OPTIONAL_PAYLOAD = [
-    ("packages", "packages"),
-]
+# Nothing. Kept as an empty list so the loop below has one code path: a root that
+# becomes optional later is a line moved out of PAYLOAD, not a second mechanism.
+OPTIONAL_PAYLOAD = []
 
 
 def is_link(path: Path) -> bool:
