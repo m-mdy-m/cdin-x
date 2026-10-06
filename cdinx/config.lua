@@ -39,6 +39,11 @@ config.extension_dir  = config.extension_dir
 config.registry_dir   = config.registry_dir or (env("CDIN_X_REGISTRY")
                                         or (base_data .. sep .. "registry" .. sep .. "cdin-x"))
 config.state_file     = config.state_file or (base_data .. sep .. "extensions.lua")
+-- The user's own choices, next to their init.lua and not beside the state file.
+-- Two different directories on purpose: `state_file` is written by the editor and
+-- lives with the machine's data; this one is written by the user and lives with
+-- their configuration, where they will look for it.
+config.packages_file  = config.packages_file or (base_config .. sep .. "packages.lua")
 config.registry_url   = config.registry_url or "https://github.com/m-mdy-m/cdin-x.git"
 
 local function raw_url_from(url)

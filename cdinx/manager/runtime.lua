@@ -5,6 +5,7 @@ local Deps   = require "cdinx.manager.deps"
 local Loader = require "cdinx.manager.loader"
 local Features = require "cdinx.manager.features"
 local With = require "cdinx.manager.with"
+local Packages = require "cdinx.packages"
 
 local Runtime = {}
 
@@ -43,20 +44,16 @@ end
 
 --- Which features the user has overridden for a package.
 ---
---- The state file is the only source today, under `features`. It is written by the
---- panel and read here; Phase 7 replaces it with `packages.lua`, and this is the
---- one place that has to change then.
+--- `<user_root>/packages.lua`, which the user owns. It used to be
+--- `ctx.state.features` -- a table on the panel's state file that nothing ever
+--- wrote and nothing ever read back: `State.save` emitted `disabled` and `lock`
+--- and nothing else, so this always returned nil and every declared `default` won.
+--- A dead switch is worse than a missing one, because the panel offers it.
 --- @param ctx table
 --- @param name string
 --- @return table<string, boolean>|nil
 local function feature_overrides(ctx, name)
-  local state = ctx.state
-  if not state then return nil end
-  local all = state.features
-  if type(all) ~= "table" then return nil end
-  local for_package = all[name]
-  if type(for_package) ~= "table" then return nil end
-  return for_package
+  return Packages.feature_overrides(name)
 end
 
 local function is_runtime_plugin(plugin)

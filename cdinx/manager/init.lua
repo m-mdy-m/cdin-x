@@ -148,6 +148,16 @@ function Manager.bootstrap()
   require("cdinx.manager.loader").ensure(config.extension_dir)
 
   ctx.state = State.load(config)
+
+  -- The user's own choices, read once here so the config is known before any
+  -- package asks what its features should be. Problems are logged rather than
+  -- raised: a packages.lua with a typo in it must not stop the editor starting.
+  local Packages = require "cdinx.packages"
+  local _, problems = Packages.load(config)
+  for _, problem in ipairs(problems) do
+    Host.core.log("cdin-x: %s", problem)
+  end
+
   collect_provided()
   merge_sources()
 

@@ -318,6 +318,12 @@ function Catalog.merge_sources(ctx, roots)
 
   ctx.available = all
   ctx.sources = source
+
+  -- Now that the whole catalog is in one table, an installed package that
+  -- predates the package layout can be recognised -- see manager/legacy.lua for
+  -- why that is reported rather than fixed here.
+  require("cdinx.manager.legacy").report(ctx)
+
   return all
 end
 

@@ -425,6 +425,48 @@ function Schema.read(path)
   return value
 end
 
+--- Runs a chunk in the sandbox and hands back whatever it produced, unvalidated.
+---
+--- For a file that is *not* a package manifest but wants the same guarantees: no
+--- `require`, no `io`, no `os`, no threads, no metatables, and a bounded budget.
+--- A user's `packages.lua` is that -- it describes their choices, and validating it
+--- against a package spec would demand a name, a version and an author from a file
+--- that has none of those and should not.
+--- @param text string
+--- @param label string|nil  what to call the file in an error message
+--- @return any|nil value
+--- @return string|nil err
+function Schema.sandboxed(text, label)
+  if type(text) ~= "string" then
+    return nil, (label or "file") .. " is not text"
+  end
+  return run_sandboxed(text, "=" .. (label or "file"))
+end
+
+--- Reads a manifest already in hand, rather than from a path.
+---
+--- Split out of `read` because there are two callers with different endings: a
+--- package's `package.lua`, which is on disk, and a user's `packages.lua`, which
+--- the panel may have just written and which reports under a name of its own. The
+--- sandbox and the validation are identical, which is the point -- two readers for
+--- two shapes of the same data is how they drift apart.
+--- @param text string
+--- @param label string|nil  what to call the file in an error message
+--- @return PackageSpec|nil spec
+--- @return string|nil err
+function Schema.read_text(text, label)
+  if type(text) ~= "string" then
+    return nil, (label or "manifest") .. " is not text"
+  end
+  local value, eerr = run_sandboxed(text, "=" .. (label or "package.lua"))
+  if value == nil and eerr then return nil, eerr end
+  local ok, errors = Schema.validate(value)
+  if not ok then
+    return nil, string.format("%s:\n  - %s", label or "manifest", table.concat(errors, "\n  - "))
+  end
+  return value
+end
+
 --- The entry point of a package: its `entry`, or the default.
 --- @param spec PackageSpec
 --- @return string
